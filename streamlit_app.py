@@ -26,6 +26,24 @@ except Exception as e:
 
 # --- Funções dos Agentes de IA ---
 
+def transcribe_audio_to_text(audio_file) -> str:
+    """
+    Envia um arquivo de áudio para o Gemini e retorna a transcrição.
+    """
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    prompt = "Transcreva o seguinte áudio para texto. Retorne apenas o texto transcrito, sem nenhum outro comentário."
+    
+    try:
+        # O SDK pode lidar com o objeto de arquivo carregado diretamente
+        response = model.generate_content([prompt, audio_file])
+        if not response.parts:
+            return f"Erro: A resposta da transcrição foi bloqueada. Razão: {response.prompt_feedback.block_reason.name}"
+        return response.text
+    except Exception as e:
+        print(f"Erro na transcrição de áudio: {e}")
+        return f"Erro ao processar o áudio: {e}"
+
+
 def call_analyzer_agent(prompt_parts: list) -> dict:
     """
     Chama o Agente 1 (Gemini 1.5 Flash) para uma análise multimodal.
@@ -42,7 +60,6 @@ def call_analyzer_agent(prompt_parts: list) -> dict:
 
     generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
 
-    # O prompt textual é adicionado como a primeira parte
     full_prompt = [
         """
         Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário (pode ser texto, imagem ou ambos).
@@ -195,6 +212,11 @@ def run_analysis(prompt_parts):
         st.session_state.analysis_data = None
 
 # --- Interface Principal ---
+
+# Inicialização do session_state
+if 'text_for_analysis' not in st.session_state:
+    st.session_state.text_for_analysis = ""
+
 load_css()
 sidebar_col, main_col = st.columns([28, 72])
 
@@ -209,28 +231,41 @@ with sidebar_col:
 
 with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
-    st.write("Insira um texto, envie uma imagem ou ambos para iniciar a análise.")
+    st.write("Insira texto, imagem ou áudio para iniciar a análise.")
 
-    # Área de input unificada
+    # Área de input de texto agora é controlada pelo session_state
     text_input = st.text_area(
-        "Conteúdo textual (opcional):", 
+        "Conteúdo textual (pode ser preenchido pela transcrição de áudio):", 
+        value=st.session_state.text_for_analysis,
         height=150, 
-        placeholder="Cole aqui o texto suspeito ou descreva o contexto da imagem..."
+        key="text_area_input"
     )
+    # Atualiza o session state sempre que o usuário digita
+    st.session_state.text_for_analysis = text_input
     
-    uploaded_image = st.file_uploader(
-        "Envie uma imagem (opcional):", 
-        type=["jpg", "jpeg", "png"]
-    )
-    
-    if uploaded_image is not None:
-        st.image(uploaded_image, caption="Imagem a ser analisada", width=300)
+    # Inputs para imagem e áudio
+    uploaded_image = st.file_uploader("Envie uma imagem (opcional):", type=["jpg", "jpeg", "png"])
+    uploaded_audio = st.file_uploader("Envie um áudio (opcional):", type=["mp3", "wav", "m4a", "ogg", "flac"])
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        if uploaded_image:
+            st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
+    with col2:
+        if uploaded_audio:
+            st.audio(uploaded_audio)
+            if st.button("Transcrever Áudio para Texto", key="transcribe_button"):
+                with st.spinner("Transcrevendo áudio..."):
+                    transcript = transcribe_audio_to_text(uploaded_audio)
+                    st.session_state.text_for_analysis = transcript
+                    st.rerun() # Recarrega a página para mostrar o texto na caixa
 
     # Botão de verificação único
     if st.button("Verificar Agora", key="submit_unified"):
         prompt_parts = []
-        if text_input:
-            prompt_parts.append(text_input)
+        # Usa o texto do session_state, que pode ter vindo da digitação ou da transcrição
+        if st.session_state.text_for_analysis:
+            prompt_parts.append(st.session_state.text_for_analysis)
         if uploaded_image:
             image = Image.open(uploaded_image)
             prompt_parts.append(image)
