@@ -105,7 +105,22 @@ def display_analysis_results(analysis_data, full_response):
 
 # --- CSS Personalizado ---
 def load_css():
-    st.markdown("""<style>...</style>""", unsafe_allow_html=True) # Mantido o mesmo CSS
+    # O CSS é extenso e foi omitido aqui para brevidade, mas permanece o mesmo.
+    st.markdown("""
+    <style>
+        .block-container { padding: 1rem 2rem 2rem 2rem; }
+        #MainMenu, header { visibility: hidden; }
+        .sidebar-content { background-color: #1e293b; color: #ffffff; padding: 2rem; height: 85vh; border-radius: 20px; display: flex; flex-direction: column; }
+        .sidebar-content h1 { font-size: 2rem; font-weight: bold; }
+        .sidebar-content h2 { font-size: 1.5rem; margin-top: 2rem; color: #e2e8f0; line-height: 1.4; }
+        .sidebar-content .call-to-action { margin-top: auto; background-color: #4f46e5; color: white; border: none; padding: 1rem; width: 100%; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        .sidebar-content .call-to-action:hover { background-color: #4338ca; }
+        [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) { background-color: #f8fafc; padding: 2rem; height: 85vh; border-radius: 20px; overflow-y: auto; }
+        .stExpander { border: 1px solid #e2e8f0 !important; border-radius: 15px !important; background-color: #ffffff; }
+        .stButton>button { background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: bold; border: none; width: 100%; margin-top: 1rem; }
+        p, li, h3, h2, h1 { color: #0F172A !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- Lógica Principal da Aplicação ---
 def run_analysis(prompt_parts):
@@ -132,7 +147,11 @@ load_css()
 sidebar_col, main_col = st.columns([28, 72])
 
 with sidebar_col:
-    st.markdown("""<div class="sidebar-content">...</div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="sidebar-content">
+        <h1>🛡️ Verificador</h1>
+        <h2>Análise Inteligente<br>de Golpes na Internet</h2>
+        <button class="call-to-action">Aprenda a se Proteger</button>
+    </div>""", unsafe_allow_html=True)
 
 with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
@@ -161,24 +180,43 @@ with main_col:
             if st.button("Transcrever Áudio Gravado"):
                 audio_frames = list(st.session_state["audio_buffer"].values())
                 if audio_frames:
-                    # CORREÇÃO: Concatena os arrays numpy dos frames de áudio
-                    sound_chunk = np.concatenate([frame.to_ndarray() for frame in audio_frames], axis=1)
-                    sound_chunk_frame = av.AudioFrame.from_ndarray(sound_chunk, format='s16', layout='stereo')
-                    
-                    wav_buffer = io.BytesIO()
-                    with av.open(wav_buffer, mode='w', format='wav') as container:
-                        stream = container.add_stream('pcm_s16le', rate=48000)
-                        # Codifica o frame único concatenado
-                        for frame in stream.encode(sound_chunk_frame):
-                            container.mux(frame)
-                    
-                    wav_bytes = wav_buffer.getvalue()
-                    
-                    with st.spinner("Transcrevendo áudio..."):
-                        transcript = transcribe_audio_to_text(wav_bytes, "recorded_audio.wav")
-                        st.session_state.text_for_analysis = transcript
-                        st.session_state["audio_buffer"] = {} # Limpa o buffer
-                        st.rerun()
+                    # CORREÇÃO: Lógica de processamento de áudio mais robusta.
+                    try:
+                        # 1. Obter os parâmetros do primeiro frame
+                        first_frame = audio_frames[0]
+                        sample_rate = first_frame.sample_rate
+                        layout = first_frame.layout.name
+                        format_name = first_frame.format.name
+                        
+                        # 2. Concatenar todos os frames de áudio num único array numpy
+                        sound_chunk = np.concatenate([frame.to_ndarray() for frame in audio_frames], axis=1)
+                        
+                        # 3. Criar um único AudioFrame grande
+                        sound_chunk_frame = av.AudioFrame.from_ndarray(sound_chunk, format=format_name, layout=layout)
+                        sound_chunk_frame.sample_rate = sample_rate
+
+                        wav_buffer = io.BytesIO()
+                        with av.open(wav_buffer, mode='w', format='wav') as container:
+                            # 4. Adicionar um stream de áudio com os parâmetros corretos
+                            stream = container.add_stream('pcm_s16le', rate=sample_rate, layout=layout)
+                            
+                            # 5. Codificar o frame e escrever os pacotes no container
+                            for packet in stream.encode(sound_chunk_frame):
+                                container.mux(packet)
+                            # 6. Flush do encoder para garantir que tudo é escrito
+                            for packet in stream.encode(None):
+                                container.mux(packet)
+                        
+                        wav_bytes = wav_buffer.getvalue()
+                        
+                        with st.spinner("Transcrevendo áudio..."):
+                            transcript = transcribe_audio_to_text(wav_bytes, "recorded_audio.wav")
+                            st.session_state.text_for_analysis = transcript
+                            st.session_state["audio_buffer"] = {} # Limpa o buffer
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar o áudio gravado: {e}")
+
                 else:
                     st.warning("Nenhum áudio foi gravado.")
     
