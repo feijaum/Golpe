@@ -141,24 +141,34 @@ with sidebar_col:
 
 with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
-    st.write("Insira texto, imagem ou grave um áudio para iniciar a análise.")
+    st.write("Insira texto, imagem ou áudio para iniciar a análise.")
 
     text_input = st.text_area("Conteúdo textual:", value=st.session_state.text_for_analysis, height=150, key="text_area_input")
     
     uploaded_image = st.file_uploader("Envie uma imagem (opcional):", type=["jpg", "jpeg", "png"])
     
-    # ATUALIZAÇÃO: Componente de gravação de áudio simplificado.
-    st.markdown("<h5>Grave um áudio (opcional):</h5>", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("<h5>Análise de Áudio</h5>", unsafe_allow_html=True)
+    
+    # Opção 1: Gravar áudio
     audio_info = mic_recorder(
         start_prompt="Clique para Gravar",
         stop_prompt="Clique para Parar",
         key='recorder'
     )
     
-    # Exibe o player de áudio se algo foi gravado.
+    # Opção 2: Enviar ficheiro de áudio
+    uploaded_audio = st.file_uploader("Ou envie um ficheiro de áudio:", type=["wav", "mp3", "m4a", "ogg"])
+    
+    # Exibe os players de áudio se algo foi gravado ou enviado
     if audio_info and audio_info['bytes']:
+        st.write("Áudio gravado:")
         st.audio(audio_info['bytes'])
 
+    if uploaded_audio:
+        st.write("Áudio enviado:")
+        st.audio(uploaded_audio)
+    
     if uploaded_image:
         st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
     
@@ -169,11 +179,16 @@ with main_col:
         if uploaded_image:
             prompt_parts.append(Image.open(uploaded_image))
         
-        # ATUALIZAÇÃO: Envia o áudio gravado diretamente para análise.
-        if audio_info and audio_info['bytes']:
+        # Lógica para decidir qual áudio processar
+        audio_to_process = None
+        if uploaded_audio:
+            audio_to_process = uploaded_audio.getvalue()
+        elif audio_info and audio_info['bytes']:
+            audio_to_process = audio_info['bytes']
+
+        if audio_to_process:
             # CORREÇÃO: Usa a forma correta de fazer o upload do áudio em memória
-            audio_bytes = audio_info['bytes']
-            audio_file = genai.upload_file(path=io.BytesIO(audio_bytes), mime_type="audio/wav")
+            audio_file = genai.upload_file(path=io.BytesIO(audio_to_process), mime_type="audio/wav")
             prompt_parts.append(audio_file)
 
         run_analysis(prompt_parts)
