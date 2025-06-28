@@ -3,7 +3,7 @@ import google.generativeai as genai
 import json
 from PIL import Image
 # ATUALIZAÇÃO: Importa a nova biblioteca de gravação de áudio
-from st_audiorec import audio_recorder
+from streamlit_mic_recorder import mic_recorder
 
 # --- Configuração da Página e API ---
 st.set_page_config(
@@ -38,7 +38,6 @@ def transcribe_audio_to_text(audio_bytes: bytes) -> str:
     prompt = "Transcreva o seguinte áudio para texto. Retorne apenas o texto transcrito, sem nenhum outro comentário."
     
     try:
-        # O Gemini pode processar os bytes de áudio WAV diretamente
         audio_file = genai.upload_file(contents=audio_bytes, mime_type="audio/wav")
         response = model.generate_content([prompt, audio_file])
         
@@ -58,7 +57,19 @@ def call_analyzer_agent(prompt_parts: list) -> dict:
     safety_settings = {'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE', 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE', 'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH', 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'}
     generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
 
-    full_prompt = ["Você é um especialista em cibersegurança (Agente Analisador)..."] + prompt_parts
+    # Atualiza o prompt para ser mais claro
+    full_prompt = [
+        """
+        Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário (pode ser texto, imagem ou ambos).
+        Sua tarefa é retornar APENAS um objeto JSON. A estrutura deve ser:
+        {
+          "analise": "Uma análise técnica detalhada sobre os possíveis riscos, identificando padrões de phishing, malware, engenharia social, etc.",
+          "risco": "Baixo", "Médio" ou "Alto",
+          "fontes": ["url_da_fonte_1", "url_da_fonte_2"]
+        }
+        Baseie sua análise em pesquisas na internet para garantir que a informação seja atual. Se não encontrar fontes, retorne uma lista vazia.
+        """
+    ] + prompt_parts
     try:
         response = model.generate_content(full_prompt, generation_config=generation_config, safety_settings=safety_settings)
         if not response.parts:
@@ -75,7 +86,9 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
     if "error" in analysis_from_agent_1: return f"Ocorreu um erro na análise inicial."
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
     safety_settings = {'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE', 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE', 'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH', 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'}
-    prompt = f"""Você é um especialista em comunicação de cibersegurança..."""
+    
+    fontes_prompt_section = '3. Uma seção "Fontes Consultadas pelo Analista" com as URLs.' if analysis_from_agent_1.get("fontes", []) else ""
+    prompt = f"""Você é um especialista em comunicação de cibersegurança. Um analista júnior forneceu o seguinte JSON:\n---\n{json.dumps(analysis_from_agent_1, indent=2, ensure_ascii=False)}\n---\nSua tarefa é criar uma resposta final para um usuário leigo..."""
     try:
         response = model.generate_content(prompt, safety_settings=safety_settings)
         if not response.parts: return f"A resposta do Agente Validador foi bloqueada."
@@ -101,7 +114,20 @@ def display_analysis_results(analysis_data, full_response):
 
 # --- CSS Personalizado ---
 def load_css():
-    st.markdown("""<style>...</style>""", unsafe_allow_html=True) # Mantido o mesmo CSS
+    st.markdown("""
+    <style>
+        .block-container { padding: 1rem 2rem 2rem 2rem; }
+        #MainMenu, header { visibility: hidden; }
+        .sidebar-content { background-color: #1e293b; color: #ffffff; padding: 2rem; height: 85vh; border-radius: 20px; display: flex; flex-direction: column; }
+        .sidebar-content h1 { font-size: 2rem; font-weight: bold; }
+        .sidebar-content h2 { font-size: 1.5rem; margin-top: 2rem; color: #e2e8f0; line-height: 1.4; }
+        .sidebar-content .call-to-action { margin-top: auto; background-color: #4f46e5; color: white; border: none; padding: 1rem; width: 100%; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) { background-color: #f8fafc; padding: 2rem; height: 85vh; border-radius: 20px; overflow-y: auto; }
+        .stExpander { border: 1px solid #e2e8f0 !important; border-radius: 15px !important; background-color: #ffffff; }
+        .stButton>button { background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: bold; border: none; width: 100%; margin-top: 1rem; }
+        p, li, h3, h2, h1 { color: #0F172A !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- Lógica Principal da Aplicação ---
 def run_analysis(prompt_parts):
@@ -124,26 +150,29 @@ load_css()
 sidebar_col, main_col = st.columns([28, 72])
 
 with sidebar_col:
-    st.markdown("""<div class="sidebar-content">...</div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="sidebar-content">
+        <h1>🛡️ Verificador</h1>
+        <h2>Análise Inteligente<br>de Golpes na Internet</h2>
+        <button class="call-to-action">Aprenda a se Proteger</button>
+    </div>""", unsafe_allow_html=True)
 
 with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
     st.write("Insira texto, imagem ou grave um áudio para iniciar a análise.")
 
-    # --- ATUALIZAÇÃO: Componente de Gravação de Áudio com st_audiorec ---
-    audio_bytes = audio_recorder(
-        text="Clique para Gravar",
-        recording_color="#e8b62c",
-        neutral_color="#6aa36f",
-        icon_name="microphone",
-        icon_size="2x",
+    # --- ATUALIZAÇÃO: Componente de Gravação de Áudio com streamlit_mic_recorder ---
+    st.markdown("<h5>Grave um áudio (opcional):</h5>", unsafe_allow_html=True)
+    audio_info = mic_recorder(
+        start_prompt="Clique para Gravar",
+        stop_prompt="Clique para Parar",
+        key='recorder'
     )
     
-    if audio_bytes:
-        st.audio(audio_bytes, format="audio/wav")
+    if audio_info and audio_info['bytes']:
+        st.audio(audio_info['bytes'])
         if st.button("Transcrever Áudio Gravado"):
             with st.spinner("Transcrevendo áudio..."):
-                transcript = transcribe_audio_to_text(audio_bytes)
+                transcript = transcribe_audio_to_text(audio_info['bytes'])
                 st.session_state.text_for_analysis = transcript
                 st.rerun()
 
@@ -154,8 +183,6 @@ with main_col:
     if uploaded_image:
         st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
     
-    # --- Fim do Componente de Gravação ---
-
     if st.button("Verificar Agora", key="submit_unified"):
         prompt_parts = []
         if st.session_state.text_for_analysis:
