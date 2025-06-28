@@ -153,7 +153,6 @@ with main_col:
         mode=WebRtcMode.SENDONLY,
         audio_receiver_size=1024,
         media_stream_constraints={"video": False, "audio": True},
-        # CORREÇÃO: Passa a configuração RTC diretamente, sem ClientSettings
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
     )
 
@@ -162,13 +161,16 @@ with main_col:
             if st.button("Transcrever Áudio Gravado"):
                 audio_frames = list(st.session_state["audio_buffer"].values())
                 if audio_frames:
-                    sound_chunk = av.AudioFrame.link_frames(audio_frames)
+                    # CORREÇÃO: Concatena os arrays numpy dos frames de áudio
+                    sound_chunk = np.concatenate([frame.to_ndarray() for frame in audio_frames], axis=1)
+                    sound_chunk_frame = av.AudioFrame.from_ndarray(sound_chunk, format='s16', layout='stereo')
                     
                     wav_buffer = io.BytesIO()
                     with av.open(wav_buffer, mode='w', format='wav') as container:
                         stream = container.add_stream('pcm_s16le', rate=48000)
-                        for frame in sound_chunk.split():
-                            container.mux(stream.encode(frame))
+                        # Codifica o frame único concatenado
+                        for frame in stream.encode(sound_chunk_frame):
+                            container.mux(frame)
                     
                     wav_bytes = wav_buffer.getvalue()
                     
