@@ -125,4 +125,72 @@ def load_css():
         .sidebar-content .call-to-action:hover { background-color: #4338ca; }
         [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) { background-color: #f8fafc; padding: 2rem; height: 85vh; border-radius: 20px; overflow-y: auto; }
         .stExpander { border: 1px solid #e2e8f0 !important; border-radius: 15px !important; background-color: #ffffff; }
-        .stButton>button { background-color: #
+        .stButton>button { background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: bold; border: none; width: 100%; margin-top: 1rem; }
+        p, li, h3, h2, h1 { color: #0F172A !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- Lógica Principal da Aplicação ---
+def run_analysis(prompt_parts):
+    if not prompt_parts:
+        st.warning("Por favor, insira um texto ou envie uma imagem para análise.")
+        return
+    with st.spinner("Analisando com o Agente 1 (Flash)..."):
+        st.session_state.analysis_data = call_analyzer_agent(prompt_parts)
+    analysis_data = st.session_state.analysis_data
+    if analysis_data and "error" not in analysis_data:
+        with st.spinner("Validando análise com o Agente 2 (Flash)..."):
+            st.session_state.full_response = call_validator_agent(analysis_data)
+    else:
+        st.error("Não foi possível obter uma análise.")
+        st.session_state.full_response = None
+        st.session_state.analysis_data = None
+
+# --- Interface Principal ---
+load_css()
+sidebar_col, main_col = st.columns([28, 72])
+
+with sidebar_col:
+    st.markdown("""<div class="sidebar-content">
+        <h1>🛡️ Verificador</h1>
+        <h2>Análise Inteligente<br>de Golpes na Internet</h2>
+        <button class="call-to-action">Aprenda a se Proteger</button>
+    </div>""", unsafe_allow_html=True)
+
+with main_col:
+    st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
+    st.write("Insira texto, imagem ou grave um áudio para iniciar a análise.")
+
+    # Componente de Gravação de Áudio com streamlit_mic_recorder
+    st.markdown("<h5>Grave um áudio (opcional):</h5>", unsafe_allow_html=True)
+    audio_info = mic_recorder(
+        start_prompt="Clique para Gravar",
+        stop_prompt="Clique para Parar",
+        key='recorder'
+    )
+    
+    if audio_info and audio_info['bytes']:
+        st.audio(audio_info['bytes'])
+        if st.button("Transcrever Áudio Gravado"):
+            with st.spinner("Transcrevendo áudio..."):
+                transcript = transcribe_audio_to_text(audio_info['bytes'])
+                st.session_state.text_for_analysis = transcript
+                st.rerun()
+
+    text_input = st.text_area("Conteúdo textual:", value=st.session_state.text_for_analysis, height=150, key="text_area_input")
+    st.session_state.text_for_analysis = text_input
+    
+    uploaded_image = st.file_uploader("Envie uma imagem (opcional):", type=["jpg", "jpeg", "png"])
+    if uploaded_image:
+        st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
+    
+    if st.button("Verificar Agora", key="submit_unified"):
+        prompt_parts = []
+        if st.session_state.text_for_analysis:
+            prompt_parts.append(st.session_state.text_for_analysis)
+        if uploaded_image:
+            prompt_parts.append(Image.open(uploaded_image))
+        run_analysis(prompt_parts)
+
+    if 'analysis_data' in st.session_state and st.session_state.analysis_data and "error" not in st.session_state.analysis_data:
+        display_analysis_results(st.session_state.analysis_data, st.session_state.full_response)
