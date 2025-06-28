@@ -3,8 +3,11 @@ import google.generativeai as genai
 import json
 from PIL import Image
 import io
-# ATUALIZAÇÃO FINAL: Importa a nova biblioteca de gravação de áudio
+# Importa a biblioteca de gravação de áudio
 from streamlit_mic_recorder import mic_recorder
+# ATUALIZAÇÃO: Importa a biblioteca para gerar PDF
+from fpdf import FPDF
+import re
 
 # --- Configuração da Página e API ---
 st.set_page_config(
@@ -39,7 +42,6 @@ def call_analyzer_agent(prompt_parts: list) -> dict:
     safety_settings = {'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE', 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE', 'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH', 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'}
     generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
 
-    # ATUALIZAÇÃO: Prompt agora menciona explicitamente a possibilidade de áudio.
     full_prompt = [
         """
         Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário (pode ser texto, imagem, áudio ou uma combinação).
@@ -78,6 +80,32 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
     except Exception as e:
         return "Ocorreu um erro ao gerar a resposta final."
 
+# --- NOVA FUNÇÃO: Gerar PDF ---
+def generate_pdf(risk_level, full_response):
+    """Gera um PDF a partir dos resultados da análise."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    
+    # Título
+    pdf.cell(0, 10, "Relatório de Análise de Risco", 0, 1, "C")
+    pdf.ln(10)
+
+    # Nível de Risco
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, f"Nível de Risco Identificado: {risk_level.upper()}", 0, 1)
+    
+    # Corpo do relatório
+    pdf.set_font("Helvetica", "", 12)
+    
+    # Limpa o texto de markdown para texto simples para o PDF
+    cleaned_response = re.sub(r'###\s*|\*\*\s*|\*\s*', '', full_response)
+    
+    # Adiciona o texto ao PDF, lidando com múltiplas linhas
+    pdf.multi_cell(0, 10, cleaned_response)
+    
+    # Retorna o PDF como bytes
+    return pdf.output(dest="S").encode("latin-1")
 
 # --- Funções de UI ---
 def get_risk_color(risk_level: str) -> str:
@@ -90,9 +118,20 @@ def get_risk_color(risk_level: str) -> str:
 def display_analysis_results(analysis_data, full_response):
     risk_level = analysis_data.get("risco", "Indeterminado")
     risk_color = get_risk_color(risk_level)
+    
     st.markdown(f"**Nível de Risco Identificado:** <span style='color:{risk_color}; font-weight: bold;'>{risk_level.upper()}</span>", unsafe_allow_html=True)
+    
     with st.expander("Ver análise completa e recomendações", expanded=True):
         st.markdown(full_response)
+        
+        # ATUALIZAÇÃO: Adiciona o botão de download
+        pdf_bytes = generate_pdf(risk_level, full_response)
+        st.download_button(
+            label="Salvar Relatório em PDF",
+            data=pdf_bytes,
+            file_name="relatorio_analise_risco.pdf",
+            mime="application/pdf"
+        )
 
 # --- CSS Personalizado ---
 def load_css():
