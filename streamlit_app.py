@@ -3,8 +3,8 @@ import google.generativeai as genai
 import json
 from PIL import Image
 import io
-# ATUALIZAÇÃO: Importa a biblioteca para gravação de áudio
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
+# ATUALIZAÇÃO: Importa a biblioteca para gravação de áudio, removendo ClientSettings
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import numpy as np
 
@@ -145,7 +145,7 @@ with main_col:
     if uploaded_image:
         st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
 
-    # --- NOVO: Componente de Gravação de Áudio ---
+    # --- ATUALIZAÇÃO: Componente de Gravação de Áudio Corrigido ---
     st.markdown("<h5>Grave um áudio (opcional):</h5>", unsafe_allow_html=True)
     
     webrtc_ctx = webrtc_streamer(
@@ -153,24 +153,21 @@ with main_col:
         mode=WebRtcMode.SENDONLY,
         audio_receiver_size=1024,
         media_stream_constraints={"video": False, "audio": True},
-        client_settings=ClientSettings(
-            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-            media_stream_constraints={"video": False, "audio": True},
-        )
+        # CORREÇÃO: Passa a configuração RTC diretamente, sem ClientSettings
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
     )
 
     if not webrtc_ctx.state.playing:
         if st.session_state.get("audio_buffer"):
             if st.button("Transcrever Áudio Gravado"):
-                audio_frames = st.session_state["audio_buffer"].values()
+                audio_frames = list(st.session_state["audio_buffer"].values())
                 if audio_frames:
-                    sound = av.AudioFrame.from_ndarray(np.concatenate(audio_frames, axis=1), format='s16', layout='stereo')
+                    sound_chunk = av.AudioFrame.link_frames(audio_frames)
                     
-                    # Converte para WAV em memória
                     wav_buffer = io.BytesIO()
                     with av.open(wav_buffer, mode='w', format='wav') as container:
-                        stream = container.add_stream('pcm_s16le', rate=48000, layout='stereo')
-                        for frame in [sound]:
+                        stream = container.add_stream('pcm_s16le', rate=48000)
+                        for frame in sound_chunk.split():
                             container.mux(stream.encode(frame))
                     
                     wav_bytes = wav_buffer.getvalue()
@@ -186,9 +183,9 @@ with main_col:
     if webrtc_ctx.audio_receiver:
         try:
             for frame in webrtc_ctx.audio_receiver.get_frames(timeout=1):
-                st.session_state["audio_buffer"][frame.time] = frame.to_ndarray()
+                st.session_state["audio_buffer"][frame.time] = frame
         except Exception:
-            pass # Ignora erros de timeout esperados
+            pass
     
     # --- Fim do Componente de Gravação ---
 
