@@ -17,11 +17,11 @@ def call_analyzer_agent(user_input: str) -> dict:
     """
     print(f"ANALYZER: Analisando o input: '{user_input[:30]}...'")
     mock_response = {
-        "analise": "O link parece ser uma tentativa de phishing clássica, usando um senso de urgência e um link encurtado para esconder o destino real. Foram encontrados relatos de golpes similares usando o nome da empresa 'Supt Scam'.",
+        "analise": "O link parece ser uma tentativa de phishing clássica, usando um senso de urgência e um link encurtado para esconder o destino real. Foram encontrados relatos de golpes similares usando o nome da empresa 'Supt Scam', que frequentemente envia mensagens com erros de gramática e ofertas irreais para enganar as vítimas.",
         "risco": "Alto",
         "fontes": [
-            "https.www.security.com/blog/phishing-report-2024",
-            "https.forum.scam-detector.com/t/supt-scam-warning/12345"
+            "https.www.security.com/blog/phishing-report-2024-latest-trends-and-attack-vectors-to-watch-out-for",
+            "https.forum.scam-detector.com/t/supt-scam-warning-new-sms-wave-targets-bank-customers/12345"
         ]
     }
     return mock_response
@@ -115,7 +115,6 @@ def load_css():
         }
 
         /* Conteúdo Principal (Coluna da Direita) */
-        /* Estiliza o container da coluna gerado pelo Streamlit */
         [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) {
              background-color: #f8fafc;
              padding: 2rem;
@@ -127,14 +126,25 @@ def load_css():
         /* Estilo para a área de resposta */
         .response-area {
             margin-top: 2rem;
-            padding: 1.5rem;
+            padding: 1rem 1.5rem;
             background-color: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 15px;
-            min-height: 250px;
+            max-height: 45vh; /* Altura máxima antes de mostrar o scroll */
+            overflow-y: auto; /* Adiciona scroll vertical quando necessário */
+            overflow-x: hidden; /* Esconde o scroll horizontal */
         }
         .response-area p, .response-area li {
-            color: #334155; /* Cor de texto mais escura para contraste */
+            color: #334155;
+            text-align: left; /* Garante alinhamento à esquerda */
+        }
+        .response-area code {
+            color: #d63384; /* Cor diferente para o código para destacar */
+            background-color: #f1f1f1;
+            padding: 2px 4px;
+            border-radius: 4px;
+            white-space: pre-wrap;       /* CSS3 */
+            word-wrap: break-word;     /* IE */
         }
         
         /* Estilo para o botão de verificação */
@@ -197,7 +207,7 @@ with main_col:
     
     # Exibe o resultado se ele existir
     if st.session_state.analysis_result:
-        # Injota o resultado HTML formatado dentro de uma div com a classe da área de resposta
+        # Injeta o resultado HTML formatado dentro de uma div com a classe da área de resposta
         st.markdown(
             f'<div class="response-area">{st.session_state.analysis_result}</div>', 
             unsafe_allow_html=True
