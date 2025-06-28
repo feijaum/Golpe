@@ -86,7 +86,6 @@ def generate_pdf(risk_level, full_response):
     pdf = FPDF()
     pdf.add_page()
     
-    # CORREÇÃO: As fontes padrão como Helvetica já vêm incluídas. Não é necessário adicionar ficheiros.
     pdf.set_font("Helvetica", "B", 16)
     
     # Título
@@ -106,8 +105,8 @@ def generate_pdf(risk_level, full_response):
     
     pdf.multi_cell(0, 10, text_for_pdf)
     
-    # CORREÇÃO: pdf.output() já retorna bytes. Não é necessário .encode()
-    return pdf.output()
+    # CORREÇÃO: pdf.output() retorna um bytearray, que deve ser convertido para bytes para o st.download_button
+    return bytes(pdf.output())
 
 # --- Funções de UI ---
 def get_risk_color(risk_level: str) -> str:
