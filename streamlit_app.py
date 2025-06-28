@@ -2,7 +2,6 @@ import streamlit as st
 import json
 
 # --- Configuração da Página ---
-# Usamos o layout "wide" para aproveitar melhor o espaço da tela, como no design.
 st.set_page_config(
     page_title="Verificador de Golpes com IA",
     page_icon="🛡️",
@@ -11,13 +10,10 @@ st.set_page_config(
 )
 
 # --- Funções de Simulação dos Agentes de IA ---
-# Estas funções simulam o comportamento dos agentes Gemini que definimos no plano.
-# Elas nos permitem desenvolver a interface sem fazer chamadas reais à API.
-
 def call_analyzer_agent(user_input: str) -> dict:
     """
     Simula o Agente 1 (Gemini 1.5 Flash).
-    Recebe o input do usuário e retorna uma primeira análise em formato JSON.
+    Retorna uma análise em formato JSON.
     """
     print(f"ANALYZER: Analisando o input: '{user_input[:30]}...'")
     mock_response = {
@@ -33,34 +29,36 @@ def call_analyzer_agent(user_input: str) -> dict:
 def call_validator_agent(analysis_from_agent_1: dict) -> str:
     """
     Simula o Agente 2 (Gemini 1.5 Pro).
-    Recebe a análise do primeiro agente e retorna o veredito final para o usuário.
+    Recebe a análise e retorna o veredito final formatado como HTML.
     """
     print("VALIDATOR: Validando a análise recebida.")
     risco = analysis_from_agent_1.get("risco", "Indeterminado")
+    analise_detalhada = analysis_from_agent_1.get("analise", "Nenhuma análise detalhada disponível.")
     fontes = analysis_from_agent_1.get("fontes", [])
     
-    # Monta uma resposta final mais elaborada e amigável para o usuário
-    # Usando Markdown para formatação
-    veredito = f"""
-    ### Veredito Final da Análise
+    # Monta a resposta final em HTML para ter controle total sobre a renderização
+    veredito_html = f"""
+    <p><b>Nível de Risco Identificado:</b> {risco}</p>
     
-    **Nível de Risco Identificado:** {risco}
+    <p><b>Análise Detalhada:</b><br>
+    {analise_detalhada} O padrão identificado é consistente com táticas de <b>phishing</b>, onde criminosos tentam roubar suas informações pessoais (senhas, dados de cartão) se passando por uma empresa legítima.</p>
     
-    **Análise Detalhada:**
-    A análise inicial indica uma forte possibilidade de golpe. O padrão identificado é consistente com táticas de **phishing**, onde criminosos tentam roubar suas informações pessoais (senhas, dados de cartão) se passando por uma empresa legítima.
+    <p><b>Recomendações de Segurança:</b></p>
+    <ol>
+        <li><b>NÃO CLIQUE</b> em nenhum link presente na mensagem.</li>
+        <li><b>NÃO FORNEÇA</b> nenhuma informação pessoal ou financeira.</li>
+        <li><b>BLOQUEIE</b> o remetente e <b>APAGUE</b> a mensagem imediatamente.</li>
+        <li>Se a mensagem se passar por uma empresa que você conhece, entre em contato com a empresa através de seus canais oficiais (site ou app) para verificar a legitimidade.</li>
+    </ol>
     
-    **Recomendações de Segurança:**
-    1.  **NÃO CLIQUE** em nenhum link presente na mensagem.
-    2.  **NÃO FORNEÇA** nenhuma informação pessoal ou financeira.
-    3.  **BLOQUEIE** o remetente e **APAGUE** a mensagem imediatamente.
-    4.  Se a mensagem se passar por uma empresa que você conhece, entre em contato com a empresa através de seus canais oficiais (site ou app) para verificar a legitimidade.
-    
-    **Fontes Consultadas pelo Analista:**
+    <p><b>Fontes Consultadas pelo Analista:</b></p>
+    <ul>
     """
     for fonte in fontes:
-        veredito += f"- `{fonte}`\n"
-        
-    return veredito
+        veredito_html += f"<li><code>{fonte}</code></li>"
+    
+    veredito_html += "</ul>"
+    return veredito_html
 
 # --- CSS e HTML Personalizado ---
 def load_css():
@@ -79,7 +77,7 @@ def load_css():
         /* Estilos para as colunas que agora formam nosso layout */
         /* Sidebar (Coluna da Esquerda) */
         .sidebar-content {
-            background-color: #1e293b; /* Azul escuro do design */
+            background-color: #1e293b;
             color: #ffffff;
             padding: 2rem;
             height: 85vh;
@@ -100,8 +98,8 @@ def load_css():
             line-height: 1.4;
         }
         .sidebar-content .call-to-action {
-            margin-top: auto; /* Empurra o botão para o final */
-            background-color: #4f46e5; /* Roxo/azul do botão */
+            margin-top: auto;
+            background-color: #4f46e5;
             color: white;
             border: none;
             padding: 1rem;
@@ -117,12 +115,13 @@ def load_css():
         }
 
         /* Conteúdo Principal (Coluna da Direita) */
-        .main-content {
-            background-color: #f8fafc; /* Fundo cinza claro */
-            padding: 2rem;
-            height: 85vh;
-            border-radius: 20px;
-            overflow-y: auto;
+        /* Estiliza o container da coluna gerado pelo Streamlit */
+        [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) {
+             background-color: #f8fafc;
+             padding: 2rem;
+             height: 85vh;
+             border-radius: 20px;
+             overflow-y: auto;
         }
         
         /* Estilo para a área de resposta */
@@ -133,6 +132,9 @@ def load_css():
             border: 1px solid #e2e8f0;
             border-radius: 15px;
             min-height: 250px;
+        }
+        .response-area p, .response-area li {
+            color: #334155; /* Cor de texto mais escura para contraste */
         }
         
         /* Estilo para o botão de verificação */
@@ -145,7 +147,8 @@ def load_css():
             font-weight: bold;
             border: none;
             width: auto;
-            float: right; /* Alinha o botão à direita */
+            float: right;
+            margin-top: 1rem;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -155,7 +158,7 @@ def load_css():
 load_css()
 
 # Criação do layout principal com duas colunas
-sidebar_col, main_col = st.columns([28, 72]) # Proporção 28%/72%
+sidebar_col, main_col = st.columns([28, 72])
 
 # --- Coluna da Esquerda (Sidebar) ---
 with sidebar_col:
@@ -169,12 +172,9 @@ with sidebar_col:
 
 # --- Coluna da Direita (Conteúdo Principal) ---
 with main_col:
-    st.markdown('<div class="main-content">', unsafe_allow_html=True)
-    
-    st.markdown("### Verificador de Conteúdo Suspeito")
+    st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
     st.write("Cole um texto, mensagem ou link abaixo para iniciar a análise.")
 
-    # Inputs do usuário
     user_input = st.text_area(
         "Conteúdo a ser analisado:", 
         height=150, 
@@ -197,9 +197,8 @@ with main_col:
     
     # Exibe o resultado se ele existir
     if st.session_state.analysis_result:
-        st.markdown('<div class="response-area">', unsafe_allow_html=True)
-        # CORREÇÃO: unsafe_allow_html=True para renderizar o Markdown corretamente
-        st.markdown(st.session_state.analysis_result, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
+        # Injota o resultado HTML formatado dentro de uma div com a classe da área de resposta
+        st.markdown(
+            f'<div class="response-area">{st.session_state.analysis_result}</div>', 
+            unsafe_allow_html=True
+        )
