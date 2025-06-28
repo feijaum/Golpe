@@ -12,9 +12,18 @@ st.set_page_config(
 
 # Configura a API do Gemini usando a chave guardada nos segredos do Streamlit
 try:
-    genai.configure(api_key=st.secrets["google_api"]["key"])
+    if "google_api" in st.secrets and "key" in st.secrets["google_api"]:
+        genai.configure(api_key=st.secrets["google_api"]["key"])
+    else:
+        st.error("A configuração da chave de API do Google não foi encontrada nos segredos.")
+        st.info("Verifique se o seu ficheiro `.streamlit/secrets.toml` está configurado corretamente com a secção `[google_api]` e a `key`.")
+        if st.secrets.keys():
+            st.warning(f"As seguintes secções foram encontradas nos seus segredos: {list(st.secrets.keys())}. A secção 'google_api' não está entre elas.")
+        else:
+            st.warning("Nenhuma configuração de segredo foi carregada pelo Streamlit. O seu ficheiro secrets.toml pode estar no local errado ou vazio.")
+        st.stop()
 except Exception as e:
-    st.error(f"Erro ao configurar a API do Google. Verifique se a seção [google_api] e a chave 'key' estão corretas no secrets.toml. Erro: {e}")
+    st.error(f"Ocorreu um erro inesperado ao configurar a API do Google. Erro: {e}")
     st.stop()
 
 
@@ -25,11 +34,8 @@ def call_analyzer_agent(user_input: str) -> dict:
     Chama o Agente 1 (Gemini 1.5 Flash) para uma análise inicial.
     Agora inclui configuração de segurança e força a saída para ser JSON.
     """
-    # ATUALIZAÇÃO: Modelo agora especifica que a resposta deve ser JSON
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
     
-    # ATUALIZAÇÃO: Configuração explícita dos filtros de segurança.
-    # Isto é importante para uma aplicação que precisa de analisar conteúdo potencialmente nocivo.
     safety_settings = {
         'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
         'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
@@ -37,7 +43,6 @@ def call_analyzer_agent(user_input: str) -> dict:
         'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
     }
 
-    # ATUALIZAÇÃO: Usar response_mime_type para forçar a saída em JSON.
     generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
 
     prompt = f"""
@@ -60,7 +65,6 @@ def call_analyzer_agent(user_input: str) -> dict:
             generation_config=generation_config,
             safety_settings=safety_settings
         )
-        # Verifica se a resposta foi bloqueada
         if not response.parts:
              return {"error": "A resposta foi bloqueada.", "details": f"Razão do bloqueio: {response.prompt_feedback.block_reason.name}"}
 
@@ -79,6 +83,15 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
         return f"Ocorreu um erro na análise inicial. Detalhes: {analysis_from_agent_1.get('details', '')}"
 
     model = genai.GenerativeModel('gemini-1.5-pro-latest')
+    
+    # ATUALIZAÇÃO: Adicionados os mesmos filtros de segurança ao agente validador
+    safety_settings = {
+        'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
+        'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
+        'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH',
+        'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
+    }
+
     prompt = f"""
     Você é um especialista em comunicação de cibersegurança (Agente Validador). Um analista júnior forneceu o seguinte JSON com uma análise de risco:
     ---
@@ -93,7 +106,16 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
     3.  Uma seção "Fontes Consultadas pelo Analista" com as URLs.
     """
     try:
-        response = model.generate_content(prompt)
+        # ATUALIZAÇÃO: Chamada à API agora inclui os filtros de segurança
+        response = model.generate_content(
+            prompt,
+            safety_settings=safety_settings
+        )
+        
+        # ATUALIZAÇÃO: Verifica se a resposta do validador também foi bloqueada
+        if not response.parts:
+             return f"A resposta do Agente Validador foi bloqueada. Razão: {response.prompt_feedback.block_reason.name}"
+
         return response.text
     except Exception as e:
         print(f"Erro no Agente Validador: {e}")
@@ -106,12 +128,12 @@ def get_risk_color(risk_level: str) -> str:
     """Retorna uma cor baseada no nível de risco."""
     risk_level = risk_level.lower()
     if risk_level == "alto":
-        return "#FF4B4B"  # Vermelho
+        return "#FF4B4B"
     elif risk_level == "médio":
-        return "#FFC700"  # Amarelo
+        return "#FFC700"
     elif risk_level == "baixo":
-        return "#28A745"  # Verde
-    return "#6c757d"  # Cinza para indeterminado
+        return "#28A745"
+    return "#6c757d"
 
 def display_analysis_results(analysis_data, full_response):
     """Exibe os resultados da análise de forma estruturada."""
@@ -208,11 +230,10 @@ with main_col:
             with st.spinner("Validando análise com o Agente 2 (Pro)..."):
                 st.session_state.full_response = call_validator_agent(analysis_data)
         else:
-            # ATUALIZAÇÃO: Mostra o erro detalhado para o usuário
-            error_details = analysis_data.get('details', 'Nenhum detalhe adicional.')
-            error_message = f"Não foi possível obter uma análise. Razão: {analysis_data.get('error', 'Erro desconhecido')}"
+            error_details = analysis_data.get('details', 'Nenhum detalhe adicional.') if analysis_data else 'Nenhum'
+            error_message = f"Não foi possível obter uma análise. Razão: {analysis_data.get('error', 'Erro desconhecido') if analysis_data else 'Erro na análise inicial'}"
             st.error(error_message)
-            st.session_state.full_response = None # Limpa a resposta anterior
+            st.session_state.full_response = None
             st.session_state.analysis_data = None
 
 
