@@ -1,7 +1,8 @@
 import streamlit as st
+import google.generativeai as genai
 import json
 
-# --- Configuração da Página ---
+# --- Configuração da Página e API ---
 st.set_page_config(
     page_title="Verificador de Golpes com IA",
     page_icon="🛡️",
@@ -9,156 +10,147 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- Funções de Simulação dos Agentes de IA ---
+# Configura a API do Gemini usando a chave guardada nos segredos do Streamlit
+try:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+except Exception as e:
+    st.error(f"Erro ao configurar a API do Google. Verifique se a GOOGLE_API_KEY está nos segredos do Streamlit. Erro: {e}")
+    st.stop()
+
+
+# --- Funções dos Agentes de IA (AGORA REAIS) ---
+
 def call_analyzer_agent(user_input: str) -> dict:
     """
-    Simula o Agente 1 (Gemini 1.5 Flash).
-    Retorna uma análise em formato JSON.
+    Chama o Agente 1 (Gemini 1.5 Flash) para uma análise inicial.
+    O prompt instrui o modelo a retornar uma resposta em formato JSON.
     """
-    print(f"ANALYZER: Analisando o input: '{user_input[:30]}...'")
-    mock_response = {
-        "analise": "O link parece ser uma tentativa de phishing clássica, usando um senso de urgência e um link encurtado para esconder o destino real. Foram encontrados relatos de golpes similares usando o nome da empresa 'Supt Scam', que frequentemente envia mensagens com erros de gramática e ofertas irreais para enganar as vítimas.",
-        "risco": "Alto",
-        "fontes": [
-            "https.www.security.com/blog/phishing-report-2024-latest-trends-and-attack-vectors-to-watch-out-for",
-            "https.forum.scam-detector.com/t/supt-scam-warning-new-sms-wave-targets-bank-customers/12345"
-        ]
-    }
-    return mock_response
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    prompt = f"""
+    Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário:
+    ---
+    {user_input}
+    ---
+    Sua tarefa é retornar APENAS um objeto JSON, sem nenhum outro texto antes ou depois.
+    O JSON deve ter a seguinte estrutura:
+    {{
+      "analise": "Uma análise técnica detalhada sobre os possíveis riscos, identificando padrões de phishing, malware, engenharia social, etc.",
+      "risco": "Baixo", "Médio" ou "Alto",
+      "fontes": ["url_da_fonte_1", "url_da_fonte_2"]
+    }}
+    Baseie sua análise em pesquisas na internet para garantir que a informação seja atual.
+    """
+    try:
+        response = model.generate_content(prompt)
+        # Tenta extrair e carregar o JSON da resposta
+        json_response = json.loads(response.text.strip())
+        return json_response
+    except (json.JSONDecodeError, AttributeError, ValueError) as e:
+        print(f"Erro ao decodificar JSON do Agente Analisador: {e}")
+        print(f"Resposta recebida: {response.text}")
+        # Retorna um dicionário de erro se a análise falhar
+        return {"error": "Não foi possível processar a análise inicial.", "details": response.text}
+
 
 def call_validator_agent(analysis_from_agent_1: dict) -> str:
     """
-    Simula o Agente 2 (Gemini 1.5 Pro).
-    Recebe a análise e retorna o veredito final formatado como HTML.
+    Chama o Agente 2 (Gemini 1.5 Pro) para validar e formatar a resposta final.
     """
-    print("VALIDATOR: Validando a análise recebida.")
-    risco = analysis_from_agent_1.get("risco", "Indeterminado")
-    analise_detalhada = analysis_from_agent_1.get("analise", "Nenhuma análise detalhada disponível.")
-    fontes = analysis_from_agent_1.get("fontes", [])
-    
-    # Monta a resposta final em HTML para ter controle total sobre a renderização
-    veredito_html = f"""
-    <p><b>Nível de Risco Identificado:</b> {risco}</p>
-    
-    <p><b>Análise Detalhada:</b><br>
-    {analise_detalhada} O padrão identificado é consistente com táticas de <b>phishing</b>, onde criminosos tentam roubar suas informações pessoais (senhas, dados de cartão) se passando por uma empresa legítima.</p>
-    
-    <p><b>Recomendações de Segurança:</b></p>
-    <ol>
-        <li><b>NÃO CLIQUE</b> em nenhum link presente na mensagem.</li>
-        <li><b>NÃO FORNEÇA</b> nenhuma informação pessoal ou financeira.</li>
-        <li><b>BLOQUEIE</b> o remetente e <b>APAGUE</b> a mensagem imediatamente.</li>
-        <li>Se a mensagem se passar por uma empresa que você conhece, entre em contato com a empresa através de seus canais oficiais (site ou app) para verificar a legitimidade.</li>
-    </ol>
-    
-    <p><b>Fontes Consultadas pelo Analista:</b></p>
-    <ul>
-    """
-    for fonte in fontes:
-        veredito_html += f"<li><code>{fonte}</code></li>"
-    
-    veredito_html += "</ul>"
-    return veredito_html
+    if "error" in analysis_from_agent_1:
+        return f"Ocorreu um erro na análise inicial. Detalhes: {analysis_from_agent_1.get('details', '')}"
 
-# --- CSS e HTML Personalizado ---
+    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+    prompt = f"""
+    Você é um especialista em comunicação de cibersegurança (Agente Validador). Um analista júnior forneceu o seguinte JSON com uma análise de risco:
+    ---
+    {json.dumps(analysis_from_agent_1, indent=2, ensure_ascii=False)}
+    ---
+    Sua tarefa é criar uma resposta final para um usuário leigo. A resposta deve ser clara, direta e útil.
+    NÃO use títulos como 'Veredito Final'. Comece diretamente com a análise.
+    Formate sua resposta usando Markdown.
+    A resposta deve conter:
+    1.  Uma seção "Análise Detalhada".
+    2.  Uma seção "Recomendações de Segurança" em formato de lista numerada.
+    3.  Uma seção "Fontes Consultadas pelo Analista" com as URLs.
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"Erro no Agente Validador: {e}")
+        return "Ocorreu um erro ao gerar a resposta final."
+
+
+# --- Funções de UI ---
+
+def get_risk_color(risk_level: str) -> str:
+    """Retorna uma cor baseada no nível de risco."""
+    risk_level = risk_level.lower()
+    if risk_level == "alto":
+        return "#FF4B4B"  # Vermelho
+    elif risk_level == "médio":
+        return "#FFC700"  # Amarelo
+    elif risk_level == "baixo":
+        return "#28A745"  # Verde
+    return "#6c757d"  # Cinza para indeterminado
+
+def display_analysis_results(analysis_data, full_response):
+    """Exibe os resultados da análise de forma estruturada."""
+    
+    risk_level = analysis_data.get("risco", "Indeterminado")
+    risk_color = get_risk_color(risk_level)
+    
+    # Exibe o nível de risco com a cor apropriada
+    st.markdown(f"**Nível de Risco Identificado:** <span style='color:{risk_color}; font-weight: bold;'>{risk_level.upper()}</span>", unsafe_allow_html=True)
+
+    # Usa um expander para os detalhes, mantendo a UI limpa
+    with st.expander("Ver análise completa e recomendações", expanded=True):
+        st.markdown(full_response)
+
+
+# --- CSS Personalizado ---
 def load_css():
     st.markdown("""
     <style>
-        /* Remove o padding padrão do Streamlit para controle total */
-        .block-container {
-            padding: 1rem 2rem 2rem 2rem;
-        }
+        .block-container { padding: 1rem 2rem 2rem 2rem; }
+        #MainMenu, header { visibility: hidden; }
 
-        /* Oculta o menu de hambúrguer e o cabeçalho do Streamlit */
-        #MainMenu, header {
-            visibility: hidden;
-        }
-
-        /* Estilos para as colunas que agora formam nosso layout */
-        /* Sidebar (Coluna da Esquerda) */
         .sidebar-content {
-            background-color: #1e293b;
-            color: #ffffff;
-            padding: 2rem;
-            height: 85vh;
-            border-radius: 20px;
-            display: flex;
-            flex-direction: column;
+            background-color: #1e293b; color: #ffffff; padding: 2rem;
+            height: 85vh; border-radius: 20px; display: flex; flex-direction: column;
         }
-        .sidebar-content h1 {
-            font-size: 2rem;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-        }
-        .sidebar-content h2 {
-            font-size: 1.5rem;
-            margin-top: 2rem;
-            color: #e2e8f0;
-            line-height: 1.4;
-        }
+        .sidebar-content h1 { font-size: 2rem; font-weight: bold; }
+        .sidebar-content h2 { font-size: 1.5rem; margin-top: 2rem; color: #e2e8f0; line-height: 1.4; }
         .sidebar-content .call-to-action {
-            margin-top: auto;
-            background-color: #4f46e5;
-            color: white;
-            border: none;
-            padding: 1rem;
-            width: 100%;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s;
+            margin-top: auto; background-color: #4f46e5; color: white; border: none;
+            padding: 1rem; width: 100%; border-radius: 10px; font-size: 1rem;
+            font-weight: bold; cursor: pointer; transition: background-color 0.3s;
         }
-        .sidebar-content .call-to-action:hover {
-            background-color: #4338ca;
-        }
-
-        /* Conteúdo Principal (Coluna da Direita) */
+        .sidebar-content .call-to-action:hover { background-color: #4338ca; }
+        
         [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) {
-             background-color: #f8fafc;
-             padding: 2rem;
-             height: 85vh;
-             border-radius: 20px;
-             overflow-y: auto;
+             background-color: #f8fafc; padding: 2rem; height: 85vh;
+             border-radius: 20px; overflow-y: auto;
         }
         
-        /* Estilo para a área de resposta */
-        .response-area {
-            margin-top: 2rem;
-            padding: 1rem 1.5rem;
+        /* Estilo para o expander que contém a resposta */
+        .stExpander {
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 15px !important;
             background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 15px;
-            max-height: 45vh; /* Altura máxima antes de mostrar o scroll */
-            overflow-y: auto; /* Adiciona scroll vertical quando necessário */
-            overflow-x: hidden; /* Esconde o scroll horizontal */
         }
-        .response-area p, .response-area li {
-            color: #334155;
-            text-align: left; /* Garante alinhamento à esquerda */
-        }
-        .response-area code {
-            color: #d63384; /* Cor diferente para o código para destacar */
-            background-color: #f1f1f1;
-            padding: 2px 4px;
-            border-radius: 4px;
-            white-space: pre-wrap;       /* CSS3 */
-            word-wrap: break-word;     /* IE */
+        .stExpander [data-testid="stExpanderDetails"] {
+            padding-top: 1rem;
         }
         
-        /* Estilo para o botão de verificação */
         .stButton>button {
-            background-color: #4f46e5;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: bold;
-            border: none;
-            width: auto;
-            float: right;
-            margin-top: 1rem;
+            background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem;
+            border-radius: 10px; font-size: 1rem; font-weight: bold;
+            border: none; width: auto; float: right; margin-top: 1rem;
+        }
+        /* Cor de fonte padrão para o texto da resposta */
+        p, li, h3 {
+           color: #0F172A !important; /* Cor preta/azul escuro para o texto */
         }
     </style>
     """, unsafe_allow_html=True)
@@ -166,11 +158,8 @@ def load_css():
 # --- Interface Principal do Aplicativo ---
 
 load_css()
-
-# Criação do layout principal com duas colunas
 sidebar_col, main_col = st.columns([28, 72])
 
-# --- Coluna da Esquerda (Sidebar) ---
 with sidebar_col:
     st.markdown("""
     <div class="sidebar-content">
@@ -180,35 +169,34 @@ with sidebar_col:
     </div>
     """, unsafe_allow_html=True)
 
-# --- Coluna da Direita (Conteúdo Principal) ---
 with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
     st.write("Cole um texto, mensagem ou link abaixo para iniciar a análise.")
 
     user_input = st.text_area(
-        "Conteúdo a ser analisado:", 
-        height=150, 
+        "Conteúdo a ser analisado:", height=150,
         placeholder="Ex: Recebi um SMS dizendo que ganhei um prêmio, com o link bit.ly/premio123. É confiável?",
         label_visibility="collapsed"
     )
 
-    submit_button = st.button("Verificar Agora")
+    if 'analysis_data' not in st.session_state:
+        st.session_state.analysis_data = None
+    if 'full_response' not in st.session_state:
+        st.session_state.full_response = None
 
-    # Lógica para processar e exibir a resposta
-    if 'analysis_result' not in st.session_state:
-        st.session_state.analysis_result = ""
-
-    if submit_button and user_input:
+    if st.button("Verificar Agora") and user_input:
         with st.spinner("Analisando com o Agente 1 (Flash)..."):
-            analysis = call_analyzer_agent(user_input)
+            st.session_state.analysis_data = call_analyzer_agent(user_input)
         
-        with st.spinner("Validando análise com o Agente 2 (Pro)..."):
-            st.session_state.analysis_result = call_validator_agent(analysis)
-    
-    # Exibe o resultado se ele existir
-    if st.session_state.analysis_result:
-        # Injeta o resultado HTML formatado dentro de uma div com a classe da área de resposta
-        st.markdown(
-            f'<div class="response-area">{st.session_state.analysis_result}</div>', 
-            unsafe_allow_html=True
-        )
+        analysis_data = st.session_state.analysis_data
+        if analysis_data and "error" not in analysis_data:
+            with st.spinner("Validando análise com o Agente 2 (Pro)..."):
+                st.session_state.full_response = call_validator_agent(analysis_data)
+        else:
+            st.session_state.full_response = "Não foi possível obter uma análise. Tente novamente."
+            st.error(st.session_state.full_response)
+
+
+    if st.session_state.analysis_data and st.session_state.full_response:
+        display_analysis_results(st.session_state.analysis_data, st.session_state.full_response)
+
