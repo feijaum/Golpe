@@ -86,8 +86,7 @@ def generate_pdf(risk_level, full_response):
     pdf = FPDF()
     pdf.add_page()
     
-    # Adiciona uma fonte que suporte caracteres latinos básicos
-    pdf.add_font('Helvetica', '', 'helvetica.pkl', uni=True)
+    # CORREÇÃO: As fontes padrão como Helvetica já vêm incluídas. Não é necessário adicionar ficheiros.
     pdf.set_font("Helvetica", "B", 16)
     
     # Título
