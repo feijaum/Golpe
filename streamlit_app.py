@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import json
 from PIL import Image
+import io
 # ATUALIZAÇÃO FINAL: Importa a nova biblioteca de gravação de áudio
 from streamlit_mic_recorder import mic_recorder
 
@@ -30,26 +31,6 @@ if 'text_for_analysis' not in st.session_state:
 
 # --- Funções dos Agentes de IA ---
 
-def transcribe_audio_to_text(audio_bytes: bytes) -> str:
-    """
-    Envia bytes de áudio para o Gemini e retorna a transcrição.
-    """
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
-    prompt = "Transcreva o seguinte áudio para texto. Retorne apenas o texto transcrito, sem nenhum outro comentário."
-    
-    try:
-        # O Gemini pode processar os bytes de áudio WAV diretamente
-        audio_file = genai.upload_file(contents=audio_bytes, mime_type="audio/wav")
-        response = model.generate_content([prompt, audio_file])
-        
-        if not response.parts:
-            return f"Erro: A resposta da transcrição foi bloqueada. Razão: {response.prompt_feedback.block_reason.name}"
-        return response.text
-    except Exception as e:
-        print(f"Erro na transcrição de áudio: {e}")
-        return f"Erro ao processar o áudio: {e}"
-
-
 def call_analyzer_agent(prompt_parts: list) -> dict:
     """
     Chama o Agente 1 (Gemini 1.5 Flash) para uma análise multimodal.
@@ -58,12 +39,13 @@ def call_analyzer_agent(prompt_parts: list) -> dict:
     safety_settings = {'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE', 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE', 'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH', 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'}
     generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
 
+    # ATUALIZAÇÃO: Prompt agora menciona explicitamente a possibilidade de áudio.
     full_prompt = [
         """
-        Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário (pode ser texto, imagem ou ambos).
+        Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário (pode ser texto, imagem, áudio ou uma combinação).
         Sua tarefa é retornar APENAS um objeto JSON. A estrutura deve ser:
         {
-          "analise": "Uma análise técnica detalhada sobre os possíveis riscos, identificando padrões de phishing, malware, engenharia social, etc.",
+          "analise": "Uma análise técnica detalhada sobre os possíveis riscos, identificando padrões de phishing, malware, engenharia social, etc. Se houver áudio, baseie sua análise no conteúdo do áudio.",
           "risco": "Baixo", "Médio" ou "Alto",
           "fontes": ["url_da_fonte_1", "url_da_fonte_2"]
         }
@@ -133,7 +115,7 @@ def load_css():
 # --- Lógica Principal da Aplicação ---
 def run_analysis(prompt_parts):
     if not prompt_parts:
-        st.warning("Por favor, insira um texto ou envie uma imagem para análise.")
+        st.warning("Por favor, insira um texto, imagem ou áudio para análise.")
         return
     with st.spinner("Analisando com o Agente 1 (Flash)..."):
         st.session_state.analysis_data = call_analyzer_agent(prompt_parts)
@@ -161,7 +143,11 @@ with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
     st.write("Insira texto, imagem ou grave um áudio para iniciar a análise.")
 
-    # Componente de Gravação de Áudio com streamlit_mic_recorder
+    text_input = st.text_area("Conteúdo textual:", value=st.session_state.text_for_analysis, height=150, key="text_area_input")
+    
+    uploaded_image = st.file_uploader("Envie uma imagem (opcional):", type=["jpg", "jpeg", "png"])
+    
+    # ATUALIZAÇÃO: Componente de gravação de áudio simplificado.
     st.markdown("<h5>Grave um áudio (opcional):</h5>", unsafe_allow_html=True)
     audio_info = mic_recorder(
         start_prompt="Clique para Gravar",
@@ -169,27 +155,27 @@ with main_col:
         key='recorder'
     )
     
+    # Exibe o player de áudio se algo foi gravado.
     if audio_info and audio_info['bytes']:
         st.audio(audio_info['bytes'])
-        if st.button("Transcrever Áudio Gravado"):
-            with st.spinner("Transcrevendo áudio..."):
-                transcript = transcribe_audio_to_text(audio_info['bytes'])
-                st.session_state.text_for_analysis = transcript
-                st.rerun()
 
-    text_input = st.text_area("Conteúdo textual:", value=st.session_state.text_for_analysis, height=150, key="text_area_input")
-    st.session_state.text_for_analysis = text_input
-    
-    uploaded_image = st.file_uploader("Envie uma imagem (opcional):", type=["jpg", "jpeg", "png"])
     if uploaded_image:
         st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
     
     if st.button("Verificar Agora", key="submit_unified"):
         prompt_parts = []
-        if st.session_state.text_for_analysis:
-            prompt_parts.append(st.session_state.text_for_analysis)
+        if text_input:
+            prompt_parts.append(text_input)
         if uploaded_image:
             prompt_parts.append(Image.open(uploaded_image))
+        
+        # ATUALIZAÇÃO: Envia o áudio gravado diretamente para análise.
+        if audio_info and audio_info['bytes']:
+            # CORREÇÃO: Usa a forma correta de fazer o upload do áudio em memória
+            audio_bytes = audio_info['bytes']
+            audio_file = genai.upload_file(path=io.BytesIO(audio_bytes), mime_type="audio/wav")
+            prompt_parts.append(audio_file)
+
         run_analysis(prompt_parts)
 
     if 'analysis_data' in st.session_state and st.session_state.analysis_data and "error" not in st.session_state.analysis_data:
