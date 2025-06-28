@@ -77,14 +77,14 @@ def call_analyzer_agent(user_input: str) -> dict:
 
 def call_validator_agent(analysis_from_agent_1: dict) -> str:
     """
-    Chama o Agente 2 (Gemini 1.5 Pro) para validar e formatar a resposta final.
+    Chama o Agente 2 (agora também Gemini 1.5 Flash) para validar e formatar a resposta final.
     """
     if "error" in analysis_from_agent_1:
         return f"Ocorreu um erro na análise inicial. Detalhes: {analysis_from_agent_1.get('details', '')}"
 
-    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+    # ATUALIZAÇÃO: Modelo do validador alterado para gemini-1.5-flash-latest para consistência.
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
     
-    # ATUALIZAÇÃO: Adicionados os mesmos filtros de segurança ao agente validador
     safety_settings = {
         'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
         'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
@@ -106,13 +106,11 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
     3.  Uma seção "Fontes Consultadas pelo Analista" com as URLs.
     """
     try:
-        # ATUALIZAÇÃO: Chamada à API agora inclui os filtros de segurança
         response = model.generate_content(
             prompt,
             safety_settings=safety_settings
         )
         
-        # ATUALIZAÇÃO: Verifica se a resposta do validador também foi bloqueada
         if not response.parts:
              return f"A resposta do Agente Validador foi bloqueada. Razão: {response.prompt_feedback.block_reason.name}"
 
@@ -227,7 +225,7 @@ with main_col:
         
         analysis_data = st.session_state.analysis_data
         if analysis_data and "error" not in analysis_data:
-            with st.spinner("Validando análise com o Agente 2 (Pro)..."):
+            with st.spinner("Validando análise com o Agente 2 (Flash)..."):
                 st.session_state.full_response = call_validator_agent(analysis_data)
         else:
             error_details = analysis_data.get('details', 'Nenhum detalhe adicional.') if analysis_data else 'Nenhum'
