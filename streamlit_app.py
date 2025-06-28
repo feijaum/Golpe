@@ -52,7 +52,7 @@ def call_analyzer_agent(prompt_parts: list) -> dict:
           "risco": "Baixo", "Médio" ou "Alto",
           "fontes": ["url_da_fonte_1", "url_da_fonte_2"]
         }
-        Baseie sua análise em pesquisas na internet para garantir que a informação seja atual.
+        Baseie sua análise em pesquisas na internet para garantir que a informação seja atual. Se não encontrar fontes, retorne uma lista vazia.
         """
     ] + prompt_parts
 
@@ -88,12 +88,10 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
         'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
     }
     
-    # ATUALIZAÇÃO: Lógica para incluir a seção de fontes apenas se existirem
     fontes = analysis_from_agent_1.get("fontes", [])
     fontes_prompt_section = ""
     if fontes:
         fontes_prompt_section = '3. Uma seção "Fontes Consultadas pelo Analista" com as URLs.'
-
 
     prompt = f"""
     Você é um especialista em comunicação de cibersegurança (Agente Validador). Um analista júnior forneceu o seguinte JSON:
@@ -137,10 +135,52 @@ def display_analysis_results(analysis_data, full_response):
 
 # --- CSS Personalizado ---
 def load_css():
-    st.markdown("""<style>...</style>""", unsafe_allow_html=True) # O CSS foi omitido para brevidade, mas é o mesmo da versão anterior
+    st.markdown("""
+    <style>
+        .block-container { padding: 1rem 2rem 2rem 2rem; }
+        #MainMenu, header { visibility: hidden; }
+
+        .sidebar-content {
+            background-color: #1e293b; color: #ffffff; padding: 2rem;
+            height: 85vh; border-radius: 20px; display: flex; flex-direction: column;
+        }
+        .sidebar-content h1 { font-size: 2rem; font-weight: bold; }
+        .sidebar-content h2 { font-size: 1.5rem; margin-top: 2rem; color: #e2e8f0; line-height: 1.4; }
+        .sidebar-content .call-to-action {
+            margin-top: auto; background-color: #4f46e5; color: white; border: none;
+            padding: 1rem; width: 100%; border-radius: 10px; font-size: 1rem;
+            font-weight: bold; cursor: pointer; transition: background-color 0.3s;
+        }
+        .sidebar-content .call-to-action:hover { background-color: #4338ca; }
+        
+        [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) {
+             background-color: #f8fafc; padding: 2rem; height: 85vh;
+             border-radius: 20px; overflow-y: auto;
+        }
+        
+        .stExpander {
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 15px !important;
+            background-color: #ffffff;
+        }
+        
+        .stButton>button {
+            background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem;
+            border-radius: 10px; font-size: 1rem; font-weight: bold;
+            border: none; width: 100%; margin-top: 1rem;
+        }
+        p, li, h3, h2, h1 {
+           color: #0F172A !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- Lógica Principal da Aplicação ---
 def run_analysis(prompt_parts):
+    if not prompt_parts:
+        st.warning("Por favor, insira um texto ou envie uma imagem para análise.")
+        return
+
     with st.spinner("Analisando com o Agente 1 (Flash)..."):
         st.session_state.analysis_data = call_analyzer_agent(prompt_parts)
     
@@ -159,40 +199,43 @@ load_css()
 sidebar_col, main_col = st.columns([28, 72])
 
 with sidebar_col:
-    st.markdown("""<div class="sidebar-content">...</div>""", unsafe_allow_html=True) # HTML da sidebar omitido para brevidade
+    st.markdown("""
+    <div class="sidebar-content">
+        <h1>🛡️ Verificador</h1>
+        <h2>Análise Inteligente<br>de Golpes na Internet</h2>
+        <button class="call-to-action">Aprenda a se Proteger</button>
+    </div>
+    """, unsafe_allow_html=True)
 
 with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
+    st.write("Insira um texto, envie uma imagem ou ambos para iniciar a análise.")
+
+    # Área de input unificada
+    text_input = st.text_area(
+        "Conteúdo textual (opcional):", 
+        height=150, 
+        placeholder="Cole aqui o texto suspeito ou descreva o contexto da imagem..."
+    )
     
-    # ATUALIZAÇÃO: Interface com separadores para diferentes tipos de input
-    tab_texto, tab_imagem, tab_audio = st.tabs(["Analisar Texto", "Analisar Imagem", "Analisar Áudio (em breve)"])
+    uploaded_image = st.file_uploader(
+        "Envie uma imagem (opcional):", 
+        type=["jpg", "jpeg", "png"]
+    )
+    
+    if uploaded_image is not None:
+        st.image(uploaded_image, caption="Imagem a ser analisada", width=300)
 
-    # Separador de Texto
-    with tab_texto:
-        st.write("Cole um texto, mensagem ou link abaixo para iniciar a análise.")
-        text_input = st.text_area("Conteúdo textual:", height=150, placeholder="Ex: Recebi um SMS...", label_visibility="collapsed")
-        if st.button("Verificar Texto", key="submit_text"):
-            if text_input:
-                run_analysis([text_input])
-
-    # Separador de Imagem
-    with tab_imagem:
-        st.write("Envie uma imagem (print de conversa, anúncio, etc.) para análise.")
-        uploaded_image = st.file_uploader("Escolha uma imagem", type=["jpg", "jpeg", "png"])
-        image_text_prompt = st.text_input("Adicione um contexto ou pergunta sobre a imagem (opcional):", placeholder="Ex: Esta mensagem que recebi é um golpe?")
+    # Botão de verificação único
+    if st.button("Verificar Agora", key="submit_unified"):
+        prompt_parts = []
+        if text_input:
+            prompt_parts.append(text_input)
+        if uploaded_image:
+            image = Image.open(uploaded_image)
+            prompt_parts.append(image)
         
-        if uploaded_image is not None:
-            st.image(uploaded_image, width=300)
-            if st.button("Verificar Imagem", key="submit_image"):
-                image = Image.open(uploaded_image)
-                prompt_parts = [image_text_prompt, image]
-                run_analysis(prompt_parts)
-
-    # Separador de Áudio (Funcionalidade futura)
-    with tab_audio:
-        st.info("Em breve: A funcionalidade de análise de áudio está em desenvolvimento.")
-        st.write("Você poderá gravar ou enviar um áudio para que a IA analise o conteúdo em busca de táticas de golpe por voz.")
-
+        run_analysis(prompt_parts)
 
     # Exibe os resultados
     if 'analysis_data' in st.session_state and st.session_state.analysis_data and "error" not in st.session_state.analysis_data:
