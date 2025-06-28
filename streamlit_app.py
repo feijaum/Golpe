@@ -6,7 +6,7 @@ import io
 # Importa a biblioteca de gravação de áudio
 from streamlit_mic_recorder import mic_recorder
 # ATUALIZAÇÃO: Importa a biblioteca para gerar PDF
-from fpdf import FPDF
+from fpdf import FPDF, XPos, YPos
 import re
 
 # --- Configuração da Página e API ---
@@ -80,32 +80,35 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
     except Exception as e:
         return "Ocorreu um erro ao gerar a resposta final."
 
-# --- NOVA FUNÇÃO: Gerar PDF ---
+# --- FUNÇÃO DE GERAR PDF ATUALIZADA ---
 def generate_pdf(risk_level, full_response):
     """Gera um PDF a partir dos resultados da análise."""
     pdf = FPDF()
     pdf.add_page()
+    
+    # Adiciona uma fonte que suporte caracteres latinos básicos
+    pdf.add_font('Helvetica', '', 'helvetica.pkl', uni=True)
     pdf.set_font("Helvetica", "B", 16)
     
     # Título
-    pdf.cell(0, 10, "Relatório de Análise de Risco", 0, 1, "C")
+    pdf.cell(0, 10, "Relatorio de Analise de Risco", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
     pdf.ln(10)
 
     # Nível de Risco
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, f"Nível de Risco Identificado: {risk_level.upper()}", 0, 1)
+    pdf.cell(0, 10, f"Nivel de Risco Identificado: {risk_level.upper()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
     # Corpo do relatório
     pdf.set_font("Helvetica", "", 12)
     
-    # Limpa o texto de markdown para texto simples para o PDF
+    # Limpa o texto de markdown e codifica para latin-1 para o PDF
     cleaned_response = re.sub(r'###\s*|\*\*\s*|\*\s*', '', full_response)
+    text_for_pdf = cleaned_response.encode('latin-1', 'replace').decode('latin-1')
     
-    # Adiciona o texto ao PDF, lidando com múltiplas linhas
-    pdf.multi_cell(0, 10, cleaned_response)
+    pdf.multi_cell(0, 10, text_for_pdf)
     
-    # Retorna o PDF como bytes
-    return pdf.output(dest="S").encode("latin-1")
+    # CORREÇÃO: pdf.output() já retorna bytes. Não é necessário .encode()
+    return pdf.output()
 
 # --- Funções de UI ---
 def get_risk_color(risk_level: str) -> str:
