@@ -12,27 +12,41 @@ st.set_page_config(
 
 # Configura a API do Gemini usando a chave guardada nos segredos do Streamlit
 try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    genai.configure(api_key=st.secrets["google_api"]["key"])
 except Exception as e:
-    st.error(f"Erro ao configurar a API do Google. Verifique se a GOOGLE_API_KEY está nos segredos do Streamlit. Erro: {e}")
+    st.error(f"Erro ao configurar a API do Google. Verifique se a seção [google_api] e a chave 'key' estão corretas no secrets.toml. Erro: {e}")
     st.stop()
 
 
-# --- Funções dos Agentes de IA (AGORA REAIS) ---
+# --- Funções dos Agentes de IA (COM MAIS ROBUSTEZ) ---
 
 def call_analyzer_agent(user_input: str) -> dict:
     """
     Chama o Agente 1 (Gemini 1.5 Flash) para uma análise inicial.
-    O prompt instrui o modelo a retornar uma resposta em formato JSON.
+    Agora inclui configuração de segurança e força a saída para ser JSON.
     """
+    # ATUALIZAÇÃO: Modelo agora especifica que a resposta deve ser JSON
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    
+    # ATUALIZAÇÃO: Configuração explícita dos filtros de segurança.
+    # Isto é importante para uma aplicação que precisa de analisar conteúdo potencialmente nocivo.
+    safety_settings = {
+        'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
+        'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
+        'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH',
+        'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
+    }
+
+    # ATUALIZAÇÃO: Usar response_mime_type para forçar a saída em JSON.
+    generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
+
     prompt = f"""
     Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário:
     ---
     {user_input}
     ---
-    Sua tarefa é retornar APENAS um objeto JSON, sem nenhum outro texto antes ou depois.
-    O JSON deve ter a seguinte estrutura:
+    Sua tarefa é retornar APENAS um objeto JSON.
+    A estrutura deve ser:
     {{
       "analise": "Uma análise técnica detalhada sobre os possíveis riscos, identificando padrões de phishing, malware, engenharia social, etc.",
       "risco": "Baixo", "Médio" ou "Alto",
@@ -41,15 +55,20 @@ def call_analyzer_agent(user_input: str) -> dict:
     Baseie sua análise em pesquisas na internet para garantir que a informação seja atual.
     """
     try:
-        response = model.generate_content(prompt)
-        # Tenta extrair e carregar o JSON da resposta
-        json_response = json.loads(response.text.strip())
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
+        # Verifica se a resposta foi bloqueada
+        if not response.parts:
+             return {"error": "A resposta foi bloqueada.", "details": f"Razão do bloqueio: {response.prompt_feedback.block_reason.name}"}
+
+        json_response = json.loads(response.text)
         return json_response
-    except (json.JSONDecodeError, AttributeError, ValueError) as e:
-        print(f"Erro ao decodificar JSON do Agente Analisador: {e}")
-        print(f"Resposta recebida: {response.text}")
-        # Retorna um dicionário de erro se a análise falhar
-        return {"error": "Não foi possível processar a análise inicial.", "details": response.text}
+    except Exception as e:
+        print(f"Erro na chamada do Agente Analisador: {e}")
+        return {"error": "Ocorreu um erro inesperado ao contactar a IA.", "details": str(e)}
 
 
 def call_validator_agent(analysis_from_agent_1: dict) -> str:
@@ -100,10 +119,8 @@ def display_analysis_results(analysis_data, full_response):
     risk_level = analysis_data.get("risco", "Indeterminado")
     risk_color = get_risk_color(risk_level)
     
-    # Exibe o nível de risco com a cor apropriada
     st.markdown(f"**Nível de Risco Identificado:** <span style='color:{risk_color}; font-weight: bold;'>{risk_level.upper()}</span>", unsafe_allow_html=True)
 
-    # Usa um expander para os detalhes, mantendo a UI limpa
     with st.expander("Ver análise completa e recomendações", expanded=True):
         st.markdown(full_response)
 
@@ -133,7 +150,6 @@ def load_css():
              border-radius: 20px; overflow-y: auto;
         }
         
-        /* Estilo para o expander que contém a resposta */
         .stExpander {
             border: 1px solid #e2e8f0 !important;
             border-radius: 15px !important;
@@ -148,9 +164,8 @@ def load_css():
             border-radius: 10px; font-size: 1rem; font-weight: bold;
             border: none; width: auto; float: right; margin-top: 1rem;
         }
-        /* Cor de fonte padrão para o texto da resposta */
         p, li, h3 {
-           color: #0F172A !important; /* Cor preta/azul escuro para o texto */
+           color: #0F172A !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -193,10 +208,13 @@ with main_col:
             with st.spinner("Validando análise com o Agente 2 (Pro)..."):
                 st.session_state.full_response = call_validator_agent(analysis_data)
         else:
-            st.session_state.full_response = "Não foi possível obter uma análise. Tente novamente."
-            st.error(st.session_state.full_response)
+            # ATUALIZAÇÃO: Mostra o erro detalhado para o usuário
+            error_details = analysis_data.get('details', 'Nenhum detalhe adicional.')
+            error_message = f"Não foi possível obter uma análise. Razão: {analysis_data.get('error', 'Erro desconhecido')}"
+            st.error(error_message)
+            st.session_state.full_response = None # Limpa a resposta anterior
+            st.session_state.analysis_data = None
 
 
-    if st.session_state.analysis_data and st.session_state.full_response:
+    if st.session_state.analysis_data and st.session_state.full_response and "error" not in st.session_state.analysis_data:
         display_analysis_results(st.session_state.analysis_data, st.session_state.full_response)
-
