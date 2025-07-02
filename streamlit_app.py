@@ -255,7 +255,7 @@ def show_protect_page():
         st.subheader("2. Ative a Autenticação de Dois Fatores (2FA)")
         st.write("A 2FA é uma tranca extra. Mesmo que alguém roube sua senha, não conseguirá acessar sua conta sem um segundo código do seu celular. Ative em todas as suas contas importantes (WhatsApp, Instagram, e-mail, bancos).")
         st.subheader("3. Checklist do Comprador Seguro")
-        st.checkbox("O site começa com https:// e tem um cadeado? �")
+        st.checkbox("O site começa com https:// e tem um cadeado? 🔒")
         st.checkbox("Os preços não são bons demais para ser verdade?")
         st.checkbox("O site tem informações claras como CNPJ e endereço?")
         st.checkbox("A reputação no Reclame Aqui é boa?")
@@ -263,7 +263,7 @@ def show_protect_page():
 
     # ATUALIZAÇÃO: Seção de Socorro reintegrada
     with st.container(border=True):
-        st.header("🆘 Fui Vítima de um Golpe!")
+        st.header("� Fui Vítima de um Golpe!")
         st.write("Descobrir um golpe é assustador, mas agir rápido pode fazer toda a diferença. Siga o plano de ação e use nosso assistente para ajudar a formalizar sua denúncia.")
 
         st.subheader("Plano de Ação Imediato")
@@ -296,7 +296,7 @@ def load_css():
         #MainMenu, header { visibility: hidden; }
         
         /* ATUALIZAÇÃO: Remove o botão de recolher a sidebar */
-        button[kind="header"] {
+        button[data-testid="stSidebarNav-collapse-control"] {
             display: none;
         }
         
@@ -378,4 +378,3 @@ if st.session_state.current_page == "verifier":
     show_verifier_page()
 else:
     show_protect_page()
-
