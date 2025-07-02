@@ -168,11 +168,47 @@ def load_css():
     <style>
         .block-container { padding: 1rem 2rem 2rem 2rem; }
         #MainMenu, header { visibility: hidden; }
-        .sidebar-content { background-color: #1e293b; color: #ffffff; padding: 2rem; height: 90vh; border-radius: 20px; display: flex; flex-direction: column; }
-        .sidebar-content h1 { font-size: 2rem; font-weight: bold; }
-        .sidebar-content h2 { font-size: 1.5rem; margin-top: 2rem; color: #e2e8f0; line-height: 1.4; }
-        .sidebar-content .call-to-action { margin-top: auto; background-color: #4f46e5; color: white; border: none; padding: 1rem; width: 100%; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
-        .sidebar-content .call-to-action:hover { background-color: #4338ca; }
+        
+        /* ATUALIZAÇÃO: Estilo da nova sidebar */
+        .sidebar-content { 
+            background-color: #ffffff; 
+            border: 2px solid #4f46e5; /* Cor da borda igual à dos botões */
+            color: #0F172A; /* Texto escuro para contraste */
+            padding: 2rem; 
+            height: 90vh; 
+            border-radius: 20px; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        .sidebar-content h1, .sidebar-content h2 { 
+            color: #0F172A !important; /* Garante que o texto seja escuro */
+        }
+        .sidebar-content h2 { 
+            font-size: 1.5rem; 
+            margin-top: 2rem; 
+            line-height: 1.4; 
+        }
+        /* ATUALIZAÇÃO: Estilo do botão/link "Aprenda a se Proteger" */
+        .sidebar-content .call-to-action { 
+            margin-top: auto; 
+            background-color: #4f46e5; 
+            color: white !important; /* Garante texto branco no botão */
+            text-decoration: none;
+            display: block;
+            text-align: center;
+            padding: 1rem; 
+            width: 100%; 
+            border-radius: 10px; 
+            font-size: 1rem; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: background-color 0.3s; 
+        }
+        .sidebar-content .call-to-action:hover { 
+            background-color: #4338ca; 
+            color: white !important;
+        }
+
         [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) { background-color: #f8fafc; padding: 2rem; height: 90vh; border-radius: 20px; overflow-y: auto; }
         .stButton>button { background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: bold; border: none; width: 100%; margin-top: 1rem; }
         p, li, h3, h2, h1 { color: #0F172A !important; }
@@ -225,10 +261,11 @@ load_css()
 sidebar_col, main_col = st.columns([30, 70]) # Ajuste de proporção
 
 with sidebar_col:
+    # ATUALIZAÇÃO: O botão agora é um link <a> com a mesma classe
     st.markdown("""<div class="sidebar-content">
         <h1>🛡️ Verificador</h1>
         <h2>Análise Inteligente<br>de Golpes na Internet</h2>
-        <button class="call-to-action">Aprenda a se Proteger</button>
+        <a href="#" target="_blank" class="call-to-action">Aprenda a se Proteger</a>
     </div>""", unsafe_allow_html=True)
 
 with main_col:
