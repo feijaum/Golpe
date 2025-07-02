@@ -71,8 +71,8 @@ def call_validator_agent(analysis_from_agent_1: dict) -> str:
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
     safety_settings = {'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE', 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE', 'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH', 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'}
     
-    fontes_prompt_section = '3. Uma seção "Fontes Consultadas pelo Analista" com as URLs.' if analysis_from_agent_1.get("fontes", []) else ""
-    prompt = f"""Você é um especialista em comunicação de cibersegurança. Um analista júnior forneceu o seguinte JSON:\n---\n{json.dumps(analysis_from_agent_1, indent=2, ensure_ascii=False)}\n---\nSua tarefa é criar uma resposta final para um usuário leigo. A resposta deve ser clara, direta e útil. NÃO use títulos como 'Veredito Final'. Comece diretamente com a análise. Formate sua resposta usando Markdown. A resposta deve conter:\n1. Uma seção "Análise Detalhada".\n2. Uma seção "Recomendações de Segurança" em formato de lista numerada.\n{fontes_prompt_section}"""
+    fontes_prompt_section = '### Fontes Consultadas pelo Analista' if analysis_from_agent_1.get("fontes", []) else ""
+    prompt = f"""Você é um especialista em comunicação de cibersegurança. Um analista júnior forneceu o seguinte JSON:\n---\n{json.dumps(analysis_from_agent_1, indent=2, ensure_ascii=False)}\n---\nSua tarefa é criar uma resposta final para um usuário leigo. A resposta deve ser clara, direta e útil. NÃO use títulos como 'Veredito Final'. Comece diretamente com a análise. Formate sua resposta usando Markdown. A resposta DEVE conter as seguintes seções, usando exatamente estes títulos com '###':\n### Análise Detalhada\n### Recomendações de Segurança\n{fontes_prompt_section}"""
     try:
         response = model.generate_content(prompt, safety_settings=safety_settings)
         if not response.parts: return f"A resposta do Agente Validador foi bloqueada."
@@ -117,22 +117,50 @@ def get_risk_color(risk_level: str) -> str:
     return "#6c757d"
 
 def display_analysis_results(analysis_data, full_response):
+    """
+    ATUALIZAÇÃO: Exibe os resultados de forma mais estruturada e visualmente agradável.
+    """
     risk_level = analysis_data.get("risco", "Indeterminado")
     risk_color = get_risk_color(risk_level)
     
     st.markdown(f"**Nível de Risco Identificado:** <span style='color:{risk_color}; font-weight: bold;'>{risk_level.upper()}</span>", unsafe_allow_html=True)
     
-    with st.expander("Ver análise completa e recomendações", expanded=True):
-        st.markdown(full_response)
-        
-        # ATUALIZAÇÃO: Adiciona o botão de download
-        pdf_bytes = generate_pdf(risk_level, full_response)
-        st.download_button(
-            label="Salvar Relatório em PDF",
-            data=pdf_bytes,
-            file_name="relatorio_analise_risco.pdf",
-            mime="application/pdf"
-        )
+    # Divide a resposta em seções usando os títulos ###
+    sections = re.split(r'###\s*(.*?)\n', full_response)
+    
+    # Dicionário para guardar as seções
+    parsed_sections = {}
+    for i in range(1, len(sections), 2):
+        title = sections[i].strip()
+        content = sections[i+1].strip()
+        parsed_sections[title] = content
+
+    # Exibe cada seção de forma estruturada
+    if "Análise Detalhada" in parsed_sections:
+        st.subheader("🔍 Análise Detalhada")
+        st.markdown(parsed_sections["Análise Detalhada"])
+
+    if "Recomendações de Segurança" in parsed_sections:
+        st.subheader("🛡️ Recomendações de Segurança")
+        recommendations = parsed_sections["Recomendações de Segurança"].split('\n')
+        for rec in recommendations:
+            # Remove números e espaços do início (ex: "1. ")
+            rec_text = re.sub(r'^\d+\.\s*', '', rec).strip()
+            if rec_text:
+                st.markdown(f"<div class='recommendation-card'>{rec_text}</div>", unsafe_allow_html=True)
+
+    if "Fontes Consultadas pelo Analista" in parsed_sections:
+        st.subheader("🔗 Fontes Consultadas")
+        st.markdown(parsed_sections["Fontes Consultadas pelo Analista"])
+
+    # Botão de download do PDF
+    pdf_bytes = generate_pdf(risk_level, full_response)
+    st.download_button(
+        label="Salvar Relatório em PDF",
+        data=pdf_bytes,
+        file_name="relatorio_analise_risco.pdf",
+        mime="application/pdf"
+    )
 
 # --- CSS Personalizado ---
 def load_css():
@@ -146,9 +174,18 @@ def load_css():
         .sidebar-content .call-to-action { margin-top: auto; background-color: #4f46e5; color: white; border: none; padding: 1rem; width: 100%; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
         .sidebar-content .call-to-action:hover { background-color: #4338ca; }
         [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) { background-color: #f8fafc; padding: 2rem; height: 85vh; border-radius: 20px; overflow-y: auto; }
-        .stExpander { border: 1px solid #e2e8f0 !important; border-radius: 15px !important; background-color: #ffffff; }
         .stButton>button { background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: bold; border: none; width: 100%; margin-top: 1rem; }
         p, li, h3, h2, h1 { color: #0F172A !important; }
+
+        /* NOVO: Estilo para os cartões de recomendação */
+        .recommendation-card {
+            background-color: #ffffff;
+            border-left: 5px solid #4f46e5;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -190,17 +227,14 @@ with main_col:
     st.markdown("---")
     st.markdown("<h5>Análise de Áudio</h5>", unsafe_allow_html=True)
     
-    # Opção 1: Gravar áudio
     audio_info = mic_recorder(
         start_prompt="Clique para Gravar",
         stop_prompt="Clique para Parar",
         key='recorder'
     )
     
-    # Opção 2: Enviar ficheiro de áudio
     uploaded_audio = st.file_uploader("Ou envie um ficheiro de áudio:", type=["wav", "mp3", "m4a", "ogg"])
     
-    # Exibe os players de áudio se algo foi gravado ou enviado
     if audio_info and audio_info['bytes']:
         st.write("Áudio gravado:")
         st.audio(audio_info['bytes'])
@@ -213,13 +247,16 @@ with main_col:
         st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
     
     if st.button("Verificar Agora", key="submit_unified"):
+        # Limpa os resultados anteriores antes de uma nova análise
+        st.session_state.analysis_data = None
+        st.session_state.full_response = None
+
         prompt_parts = []
         if text_input:
             prompt_parts.append(text_input)
         if uploaded_image:
             prompt_parts.append(Image.open(uploaded_image))
         
-        # Lógica para decidir qual áudio processar
         audio_to_process = None
         if uploaded_audio:
             audio_to_process = uploaded_audio.getvalue()
@@ -227,11 +264,13 @@ with main_col:
             audio_to_process = audio_info['bytes']
 
         if audio_to_process:
-            # CORREÇÃO: Usa a forma correta de fazer o upload do áudio em memória
             audio_file = genai.upload_file(path=io.BytesIO(audio_to_process), mime_type="audio/wav")
             prompt_parts.append(audio_file)
 
         run_analysis(prompt_parts)
 
-    if 'analysis_data' in st.session_state and st.session_state.analysis_data and "error" not in st.session_state.analysis_data:
-        display_analysis_results(st.session_state.analysis_data, st.session_state.full_response)
+    # Container para exibir os resultados
+    results_placeholder = st.empty()
+    with results_placeholder.container():
+        if 'analysis_data' in st.session_state and st.session_state.analysis_data and "error" not in st.session_state.analysis_data:
+            display_analysis_results(st.session_state.analysis_data, st.session_state.full_response)
