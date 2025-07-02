@@ -4,3 +4,4 @@ streamlit_mic_recorder
 fpdf2
 pandas
 altair
+streamlit-js-eval
