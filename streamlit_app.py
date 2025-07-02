@@ -245,7 +245,11 @@ def load_css():
     <style>
         #MainMenu, header { visibility: hidden; }
         
-        /* ATUALIZAÇÃO: Estilo da nova sidebar branca com borda */
+        /* ATUALIZAÇÃO: Oculta o botão de recolher a sidebar */
+        button[data-testid="stSidebarNav-collapse-control"] {
+            display: none;
+        }
+        
         [data-testid="stSidebar"] > div:first-child {
             background-color: #ffffff;
             border-right: 2px solid #4f46e5;
