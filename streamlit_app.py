@@ -235,31 +235,30 @@ with main_col:
     st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
     st.write("Insira texto, imagem ou áudio para iniciar a análise.")
 
-    text_input = st.text_area("Conteúdo textual:", value=st.session_state.text_for_analysis, height=150, key="text_area_input")
-    
-    # ATUALIZAÇÃO: Layout de upload compacto
-    upload_col1, upload_col2 = st.columns(2)
-    with upload_col1:
-        uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "jpeg", "png"])
-    with upload_col2:
-        uploaded_audio = st.file_uploader("Envie um ficheiro de áudio:", type=["wav", "mp3", "m4a", "ogg"])
+    # ATUALIZAÇÃO: Layout de input com duas colunas
+    input_col, options_col = st.columns([60, 40])
 
-    st.markdown("<h6>Ou grave um áudio:</h6>", unsafe_allow_html=True)
-    audio_info = mic_recorder(
-        start_prompt="Clique para Gravar",
-        stop_prompt="Clique para Parar",
-        key='recorder'
-    )
+    with input_col:
+        text_input = st.text_area("Conteúdo textual:", height=300, key="text_area_input")
     
-    # Exibe os previews dos ficheiros enviados
-    preview_col1, preview_col2 = st.columns(2)
-    with preview_col1:
+    with options_col:
+        uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "jpeg", "png"])
         if uploaded_image:
-            st.image(uploaded_image, caption="Imagem a ser analisada", width=200)
-    with preview_col2:
+            st.image(uploaded_image, caption="Imagem a ser analisada", use_column_width=True)
+        
+        st.markdown("---")
+        
+        uploaded_audio = st.file_uploader("Envie um ficheiro de áudio:", type=["wav", "mp3", "m4a", "ogg"])
         if uploaded_audio:
             st.audio(uploaded_audio)
-        elif audio_info and audio_info['bytes']:
+            
+        st.markdown("<h6>Ou grave um áudio:</h6>", unsafe_allow_html=True)
+        audio_info = mic_recorder(
+            start_prompt="Gravar",
+            stop_prompt="Parar",
+            key='recorder'
+        )
+        if audio_info and audio_info['bytes']:
             st.audio(audio_info['bytes'])
     
     if st.button("Verificar Agora", key="submit_unified"):
