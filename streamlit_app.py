@@ -296,9 +296,12 @@ def load_css(theme):
         .recommendation-card { 
             background-color: var(--secondary-bg); 
             border-left: 5px solid var(--button-bg);
+            padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .social-links a { color: var(--button-bg); }
-        /* Outros estilos omitidos para brevidade */
+        .social-links a { color: var(--button-bg); text-decoration: none; margin: 0 10px; }
+        .donation-section { margin-top: 2rem; text-align: center; }
+        .social-links { text-align: center; margin-top: 1rem; margin-bottom: 2rem; }
+        .pix-button { padding: 0.5rem 1rem; width: 100%; cursor: pointer; margin-top: 1rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -312,7 +315,7 @@ load_css(active_theme)
 
 # Renderiza a sidebar
 with st.sidebar:
-    st.radio( "Tema", ["Automático", "Claro", "Escuro"], key="theme", horizontal=True, on_change=lambda: st.rerun())
+    st.radio( "Tema", ["Automático", "Claro", "Escuro"], key="theme", horizontal=True)
     
     qrcode_b64 = get_image_as_base64("qrcodepix.jpeg")
     qrcode_data_uri = f"data:image/jpeg;base64,{qrcode_b64}" if qrcode_b64 else ""
