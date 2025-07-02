@@ -245,28 +245,24 @@ def load_css():
     <style>
         #MainMenu, header { visibility: hidden; }
         
-        /* Estilo da Sidebar Nativa */
+        /* ATUALIZAÇÃO: Estilo da nova sidebar branca com borda */
         [data-testid="stSidebar"] > div:first-child {
-            background-color: #1e293b;
+            background-color: #ffffff;
+            border-right: 2px solid #4f46e5;
         }
         
         .sidebar-content h1, .sidebar-content h2, .sidebar-content h4, .sidebar-content p { 
-            color: #ffffff !important; 
-        }
-        .sidebar-content h2 { 
-            font-size: 1.5rem; 
-            margin-top: 2rem; 
-            line-height: 1.4; 
+            color: #0F172A !important; 
         }
         .donation-section { margin-top: 2rem; text-align: center; }
         .social-links { text-align: center; margin-top: 1rem; margin-bottom: 2rem; }
-        .social-links a { text-decoration: none; color: #a5b4fc; margin: 0 10px; }
+        .social-links a { text-decoration: none; color: #4f46e5; margin: 0 10px; }
 
         .pix-button { background-color: #4f46e5; color: white !important; padding: 0.5rem 1rem; border-radius: 10px; font-weight: bold; border: none; width: 100%; cursor: pointer; margin-top: 1rem; }
-        .pix-button:hover { background-color: #6366f1; }
+        .pix-button:hover { background-color: #4338ca; }
 
         .stButton>button { background-color: #4f46e5; color: white; border-radius: 10px; font-weight: bold; border: none; }
-        .stButton>button:hover { background-color: #6366f1; }
+        .stButton>button:hover { background-color: #4338ca; }
         
         button[kind="secondary"] { background-color: transparent !important; color: #4f46e5 !important; border: 1px solid #4f46e5 !important; }
         
@@ -295,7 +291,6 @@ with st.sidebar:
     st.markdown('<div class="social-links"><a href="https://www.instagram.com/prof.jvictor/" target="_blank">Instagram</a> | <a href="https://linkedin.com/in/jvictorll/" target="_blank">LinkedIn</a></div>', unsafe_allow_html=True)
     
     st.markdown('<hr>', unsafe_allow_html=True)
-    # ATUALIZAÇÃO: Botão para o Guia de Segurança
     if st.session_state.current_page == "verifier":
         if st.button("Guia de Segurança", key="to_protect", use_container_width=True):
             st.session_state.current_page = "protect"
