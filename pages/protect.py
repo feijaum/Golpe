@@ -3,20 +3,10 @@ import pandas as pd
 import altair as alt
 import google.generativeai as genai
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(
-    page_title="Guia de Segurança Digital",
-    page_icon="🛡️",
-    layout="wide"
-)
-
 # --- CONFIGURAÇÃO DA API DO GEMINI ---
-# Instrução para o usuário:
-# 1. Crie um arquivo .streamlit/secrets.toml no diretório do seu app
-# 2. Adicione sua chave da API nele:
-#    GEMINI_API_KEY = "SUA_CHAVE_API_AQUI"
+# Usa a mesma configuração de segredos da página principal
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    genai.configure(api_key=st.secrets["google_api"]["key"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 except (KeyError, FileNotFoundError):
     st.error("A chave da API do Gemini não foi encontrada. Por favor, configure-a em .streamlit/secrets.toml")
@@ -24,17 +14,12 @@ except (KeyError, FileNotFoundError):
 
 
 # --- ESTILOS CSS CUSTOMIZADOS ---
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-
-# Criando um arquivo CSS temporário para injetar
-with open("style.css", "w") as f:
-    f.write("""
+st.markdown("""
+<style>
     .stApp {
         background-color: #F0F2F6;
     }
-    .st-emotion-cache-1y4p8pa {
+    .main .block-container {
         padding-top: 2rem;
     }
     h1, h2, h3 {
@@ -56,9 +41,8 @@ with open("style.css", "w") as f:
         background-color: #4338CA;
         color: white;
     }
-    """)
-
-local_css("style.css")
+</style>
+""", unsafe_allow_html=True)
 
 
 # --- FUNÇÕES AUXILIARES ---
@@ -181,7 +165,7 @@ with st.container(border=True):
 # --- SEÇÃO 4: SOCORRO ---
 st.markdown("---")
 with st.container(border=True):
-    st.header("� Fui Vítima de um Golpe!")
+    st.header("🆘 Fui Vítima de um Golpe!")
     st.write("Descobrir um golpe é assustador, mas agir rápido pode fazer toda a diferença. Siga o plano de ação e use nosso assistente para ajudar a formalizar sua denúncia.")
 
     st.subheader("Plano de Ação Imediato")
@@ -207,4 +191,3 @@ with st.container(border=True):
                 st.success("Relato gerado com sucesso! Copie o texto acima.")
         else:
             st.warning("Por favor, preencha todos os campos para gerar o relato.")
-�
