@@ -240,6 +240,8 @@ with main_col:
 
     with input_col:
         text_input = st.text_area("Conteúdo textual:", height=300, key="text_area_input")
+        # ATUALIZAÇÃO: Botão movido para baixo da caixa de texto
+        verify_button = st.button("Verificar Agora", key="submit_unified")
     
     with options_col:
         uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "jpeg", "png"])
@@ -261,7 +263,8 @@ with main_col:
         if audio_info and audio_info['bytes']:
             st.audio(audio_info['bytes'])
     
-    if st.button("Verificar Agora", key="submit_unified"):
+    # Lógica de verificação agora é chamada aqui, após todos os inputs serem definidos
+    if verify_button:
         st.session_state.analysis_data = None
         st.session_state.full_response = None
 
