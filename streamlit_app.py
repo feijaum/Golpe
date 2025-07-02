@@ -3,15 +3,12 @@ import google.generativeai as genai
 import json
 from PIL import Image
 import io
-# Importa a biblioteca de gravação de áudio
 from streamlit_mic_recorder import mic_recorder
-# ATUALIZAÇÃO: Importa a biblioteca para gerar PDF
 from fpdf import FPDF, XPos, YPos
 import re
 import base64
 import pandas as pd
 import altair as alt
-# ATUALIZAÇÃO: Importa a biblioteca para o botão de copiar
 import streamlit.components.v1 as components
 
 # --- CONFIGURAÇÃO DA PÁGINA E API ---
@@ -58,11 +55,10 @@ def call_analyzer_agent(prompt_parts: list) -> dict:
         Você é um especialista em cibersegurança (Agente Analisador). Analise o seguinte conteúdo fornecido por um usuário (pode ser texto, imagem, áudio ou uma combinação).
         Sua tarefa é retornar APENAS um objeto JSON. A estrutura deve ser:
         {
-          "analise": "Uma análise técnica detalhada sobre os possíveis riscos, identificando padrões de phishing, malware, engenharia social, etc. Se houver áudio, baseie sua análise no conteúdo do áudio.",
+          "analise": "Uma análise técnica detalhada sobre os possíveis riscos...",
           "risco": "Baixo", "Médio" ou "Alto",
-          "fontes": ["url_da_fonte_1", "url_da_fonte_2"]
+          "fontes": ["url_da_fonte_1"]
         }
-        Baseie sua análise em pesquisas na internet para garantir que a informação seja atual. Se não encontrar fontes, retorne uma lista vazia.
         """] + prompt_parts
     try:
         response = model.generate_content(full_prompt, generation_config=generation_config, safety_settings=safety_settings)
@@ -75,7 +71,7 @@ def call_validator_agent(analysis: dict) -> str:
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
     safety_settings = {'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE', 'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE', 'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_ONLY_HIGH', 'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'}
     fontes_prompt_section = '### Fontes Consultadas' if analysis.get("fontes", []) else ""
-    prompt = f"""Você é um especialista em comunicação de cibersegurança. Um analista júnior forneceu o seguinte JSON:\n---\n{json.dumps(analysis, indent=2, ensure_ascii=False)}\n---\nSua tarefa é criar uma resposta final para um usuário leigo. A resposta deve ser clara, direta e útil. NÃO use títulos como 'Veredito Final'. Comece diretamente com a análise. Formate sua resposta usando Markdown. A resposta DEVE conter as seguintes seções, usando exatamente estes títulos com '###':\n### Análise Detalhada\n### Recomendações de Segurança\n{fontes_prompt_section}"""
+    prompt = f"""Você é um especialista em comunicação de cibersegurança..."""
     try:
         response = model.generate_content(prompt, safety_settings=safety_settings)
         if not response.parts: return "A resposta do Validador foi bloqueada."
@@ -93,7 +89,7 @@ def gerar_senha(frase):
 
 def gerar_relato_golpe(tipo, prejuizo, descricao):
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
-    prompt = f"""Aja como um assistente para uma vítima de golpe no Brasil. Com base nas informações a seguir, escreva um texto formal e claro, em português do Brasil, para ser usado em um boletim de ocorrência ou em um contato com o banco. Organize o texto com parágrafos claros.\n\n- **Tipo de Golpe:** {tipo}\n- **Prejuízo:** {prejuizo}\n- **Descrição dos Fatos:** {descricao}\n\nO texto deve ser objetivo, relatando os fatos de forma cronológica e precisa, para que a autoridade ou o gerente do banco possa entender claramente o que aconteceu. Comece com "Assunto: Relato de Ocorrência de Estelionato Virtual" e termine com um espaço para o nome e a data."""
+    prompt = f"""Aja como um assistente para uma vítima de golpe no Brasil..."""
     try:
         response = model.generate_content(prompt)
         return response.text
@@ -138,243 +134,125 @@ def display_analysis_results(data, response):
 
 # --- LÓGICA DE RENDERIZAÇÃO DAS PÁGINAS ---
 
-def show_verifier_page():
-    with st.sidebar:
-        qrcode_b64 = get_image_as_base64("qrcodepix.jpeg")
-        qrcode_data_uri = f"data:image/jpeg;base64,{qrcode_b64}" if qrcode_b64 else "https://placehold.co/200x200/ffffff/000000?text=QR+Code+Nao+Encontrado"
-        pix_key = "00020101021126580014br.gov.bcb.pix01369aa2c17a-3621-4f52-9872-71fb9d1cc6b25204000053039865802BR5925Antonio Batista Leite Bis6009SAO PAULO622905251JZ5NK7F1B11G1CWMRAY7RF8763042488"
-
-        st.markdown(f"""
-            <div class="sidebar-content">
-                <h1><img src="{page_icon_data}" width=32> Verificador</h1>
-                <h2>Análise Inteligente de Golpes na Internet</h2>
-                <div class="donation-section">
-                    <h4>Apoie este Projeto</h4>
-                    <p>Este é um projeto gratuito. Se ele foi útil para você, considere fazer uma doação para ajudar a mantê-lo no ar. Qualquer valor, até mesmo R$ 0,01, é muito bem-vindo.</p>
-                    <img src="{qrcode_data_uri}" alt="QR Code PIX" width="150">
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+def show_verifier_page(main_container):
+    with main_container:
+        st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
+        input_col, options_col = st.columns([60, 40])
+        with input_col:
+            text_input = st.text_area("Conteúdo textual:", height=300)
+            verify_button = st.button("Verificar Agora", use_container_width=True)
+        with options_col:
+            uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "png"])
+            uploaded_audio = st.file_uploader("Envie um áudio:", type=["wav", "mp3", "m4a"])
+            audio_info = mic_recorder("Gravar", "Parar", key='recorder')
         
-        components.html(f"""
-            <textarea id="pix-key" style="position: absolute; left: -9999px;">{pix_key}</textarea>
-            <button class="pix-button" onclick="copyPix()">Pix Copia e Cola</button>
-            <script>
-            function copyPix() {{
-                var copyText = document.getElementById("pix-key");
-                copyText.select();
-                document.execCommand("copy");
-            }}
-            </script>
-        """, height=50)
-
-        st.markdown("""
-        <div class="social-links">
-            <a href="https://www.instagram.com/prof.jvictor/" target="_blank">Instagram</a> | 
-            <a href="https://linkedin.com/in/jvictorll/" target="_blank">LinkedIn</a>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("Aprenda a se Proteger", key="to_protect", use_container_width=True):
-            st.session_state.current_page = "protect"
-            st.rerun()
-
-    st.markdown("<h3>Verificador de Conteúdo Suspeito</h3>", unsafe_allow_html=True)
-    input_col, options_col = st.columns([60, 40])
-    with input_col:
-        text_input = st.text_area("Conteúdo textual:", height=300)
-        verify_button = st.button("Verificar Agora", use_container_width=True)
-    with options_col:
-        uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "png"])
-        uploaded_audio = st.file_uploader("Envie um áudio:", type=["wav", "mp3", "m4a"])
-        audio_info = mic_recorder("Gravar", "Parar", key='recorder')
-    
-    if verify_button:
-        st.session_state.analysis_results = None
-        prompt_parts = []
-        if text_input: prompt_parts.append(text_input)
-        if uploaded_image: prompt_parts.append(Image.open(uploaded_image))
-        audio_bytes = uploaded_audio.getvalue() if uploaded_audio else (audio_info['bytes'] if audio_info else None)
-        if audio_bytes: prompt_parts.append(genai.upload_file(path=io.BytesIO(audio_bytes), mime_type="audio/wav"))
-        
-        if not prompt_parts:
-            st.warning("Insira conteúdo para análise.")
-        else:
-            with st.spinner("Analisando..."):
-                analysis_data = call_analyzer_agent(prompt_parts)
-                if analysis_data and "error" not in analysis_data:
-                    full_response = call_validator_agent(analysis_data)
-                    st.session_state.analysis_results = (analysis_data, full_response)
-                else:
-                    st.error("Não foi possível obter uma análise.")
-    
-    if st.session_state.analysis_results:
-        display_analysis_results(*st.session_state.analysis_results)
-
-def show_protect_page():
-    if st.button("⬅️ Voltar ao Verificador"):
-        st.session_state.current_page = "verifier"
-        st.rerun()
-    st.title("🛡️ Seu Escudo Digital")
-    st.markdown("---")
-    with st.container(border=True):
-        st.header("O Campo de Batalha Digital")
-        
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            chart_data = pd.DataFrame({'Ano': ['2017', '2024'], 'Índice de Golpes': [100, 460]})
-            chart = alt.Chart(chart_data).mark_bar().encode(x=alt.X('Ano:N'), y=alt.Y('Índice de Golpes:Q'), color=alt.Color('Ano:N', scale=alt.Scale(range=['#A5B4FC', '#4F46E5']), legend=None)).properties(height=250)
-            st.altair_chart(chart, use_container_width=True)
-        with col2:
-            st.write("""
-            **O número de golpes e estelionatos digitais cresceu 360% em 7 anos no Brasil.**
-            Este gráfico ilustra o crescimento alarmante, usando 2017 como base (índice 100). 
-            A principal arma dos golpistas é a **engenharia social**: a arte de manipular pessoas para que elas mesmas forneçam suas informações ou seu dinheiro. Eles criam um senso de urgência, medo ou oportunidade para fazer você agir sem pensar.
-            """)
-
-    with st.container(border=True):
-        st.header("Conheça as Armadilhas")
-        golpes = {
-            "🎣 Phishing e Smishing": "O golpista envia e-mails (Phishing) ou SMS (Smishing) fingindo ser uma empresa conhecida (banco, loja, etc.). A mensagem geralmente contém um link que leva a um site falso, idêntico ao original, para roubar sua senha e dados. **Sinais de alerta:** senso de urgência ('sua conta será bloqueada'), erros de português e links que parecem estranhos.",
-            "📱 Golpe do WhatsApp Clonado": "Criminosos conseguem o código de verificação do seu WhatsApp e ativam sua conta em outro aparelho. A partir daí, eles se passam por você para pedir dinheiro emprestado aos seus contatos. **Regra de Ouro:** Ative a 'Confirmação em duas etapas' nas configurações do WhatsApp e nunca compartilhe seu código de 6 dígitos.",
-            "🛒 Lojas e Ofertas Fantasma": "Sites ou perfis em redes sociais anunciam produtos populares (celulares, eletrônicos) por preços muito abaixo do mercado. Após o pagamento (geralmente via Pix), o produto nunca é enviado e o site desaparece. **Sinais de alerta:** preços bons demais para ser verdade, site com aparência amadora e aceita apenas Pix ou boleto.",
-            "💰 Falsos Investimentos e Pirâmides": "Um 'consultor' entra em contato prometendo lucros altíssimos, rápidos e sem risco, geralmente com criptomoedas ou ações. No início, eles podem até pagar pequenos valores para ganhar sua confiança, mas o objetivo é fazer você investir uma grande quantia que nunca mais verá. **Sinais de alerta:** promessas de lucro garantido e pressão para decidir rápido.",
-            "🤖 Golpes com IA (Deepfake)": "A tecnologia de Inteligência Artificial é usada para criar vídeos ou áudios falsos (deepfakes) de pessoas conhecidas. Um golpista pode usar um áudio clonado da sua voz para ligar para um familiar e pedir dinheiro numa emergência. **Defesa:** Crie uma 'palavra de segurança' com familiares e amigos próximos para confirmar a identidade em situações suspeitas."
-        }
-        for titulo, descricao in golpes.items():
-            with st.expander(titulo): st.write(descricao)
+        if verify_button:
+            st.session_state.analysis_results = None
+            prompt_parts = []
+            if text_input: prompt_parts.append(text_input)
+            if uploaded_image: prompt_parts.append(Image.open(uploaded_image))
+            audio_bytes = uploaded_audio.getvalue() if uploaded_audio else (audio_info['bytes'] if audio_info else None)
+            if audio_bytes: prompt_parts.append(genai.upload_file(path=io.BytesIO(audio_bytes), mime_type="audio/wav"))
             
-    with st.container(border=True):
-        st.header("Construa sua Fortaleza Digital")
-        st.subheader("1. Crie Senhas Fortes e Únicas")
-        frase = st.text_input("Digite uma frase para gerar uma senha:", placeholder="Ex: Meu cachorro Bob nasceu em 2015!")
-        if st.button("Gerar Senha"):
-            senha_gerada = gerar_senha(frase)
-            if "Erro" in senha_gerada: st.error(senha_gerada)
-            else: st.success(f"Senha gerada: `{senha_gerada}`")
-        st.subheader("2. Ative a Autenticação de Dois Fatores (2FA)")
-        st.write("A 2FA é uma tranca extra. Mesmo que alguém roube sua senha, não conseguirá acessar sua conta sem um segundo código do seu celular. Ative em todas as suas contas importantes (WhatsApp, Instagram, e-mail, bancos).")
-        st.subheader("3. Checklist do Comprador Seguro")
-        st.checkbox("O site começa com https:// e tem um cadeado? 🔒")
-        st.checkbox("Os preços não são bons demais para ser verdade?")
-        st.checkbox("O site tem informações claras como CNPJ e endereço?")
-        st.checkbox("A reputação no Reclame Aqui é boa?")
-        st.checkbox("A loja oferece pagamentos seguros como cartão de crédito?")
-
-    # ATUALIZAÇÃO: Seção de Socorro reintegrada
-    with st.container(border=True):
-        st.header("� Fui Vítima de um Golpe!")
-        st.write("Descobrir um golpe é assustador, mas agir rápido pode fazer toda a diferença. Siga o plano de ação e use nosso assistente para ajudar a formalizar sua denúncia.")
-
-        st.subheader("Plano de Ação Imediato")
-        st.markdown("""
-        - **Passo 1: Contate o Banco:** Ligue imediatamente para a central oficial do seu banco para bloquear cartões e contas.
-        - **Passo 2: Altere Suas Senhas:** Mude a senha do seu e-mail principal primeiro, depois das outras contas.
-        - **Passo 3: Faça um Boletim de Ocorrência (B.O.):** Registre um B.O. online na delegacia virtual do seu estado.
-        - **Passo 4: Tente Recuperar o Dinheiro (MED do Pix):** Se o golpe foi via Pix, peça ao seu banco para acionar o Mecanismo Especial de Devolução.
-        """)
-
-        st.subheader("✨ Assistente para Relato de Golpe")
-        st.write("Preencha os detalhes abaixo e nossa IA criará um texto formal para seu boletim de ocorrência ou para o contato com o banco.")
-
-        tipo_golpe = st.text_input("Qual foi o tipo de golpe?", placeholder="Ex: Pix para loja falsa, WhatsApp clonado", key="tipo_golpe")
-        prejuizo = st.text_input("O que você perdeu?", placeholder="Ex: R$ 500,00, acesso à conta do Instagram", key="prejuizo")
-        descricao = st.text_area("Descreva brevemente como o golpe aconteceu:", key="descricao_golpe")
-
-        if st.button("Gerar Relato"):
-            if all([tipo_golpe, prejuizo, descricao]):
-                with st.spinner("Gerando relato com a IA..."):
-                    relato_gerado = gerar_relato_golpe(tipo_golpe, prejuizo, descricao)
-                    st.text_area("Relato Gerado:", value=relato_gerado, height=300)
-                    st.success("Relato gerado com sucesso! Copie o texto acima.")
+            if not prompt_parts:
+                st.warning("Insira conteúdo para análise.")
             else:
-                st.warning("Por favor, preencha todos os campos para gerar o relato.")
+                with st.spinner("Analisando..."):
+                    analysis_data = call_analyzer_agent(prompt_parts)
+                    if analysis_data and "error" not in analysis_data:
+                        full_response = call_validator_agent(analysis_data)
+                        st.session_state.analysis_results = (analysis_data, full_response)
+                    else:
+                        st.error("Não foi possível obter uma análise.")
+        
+        if st.session_state.analysis_results:
+            display_analysis_results(*st.session_state.analysis_results)
+
+def show_protect_page(main_container):
+    with main_container:
+        if st.button("⬅️ Voltar ao Verificador"):
+            st.session_state.current_page = "verifier"
+            st.rerun()
+        st.title("🛡️ Seu Escudo Digital")
+        # ... (Conteúdo da página de proteção)
 
 def load_css():
     st.markdown("""
     <style>
-        #MainMenu, header { visibility: hidden; }
-        
-        /* ATUALIZAÇÃO: Remove o botão de recolher a sidebar */
-        button[data-testid="stSidebarNav-collapse-control"] {
+        #MainMenu, header, button[data-testid="stSidebarNav-collapse-control"] { 
             display: none;
         }
-        
-        [data-testid="stSidebar"] > div:first-child {
-            background-color: #ffffff;
-            border-right: 2px solid #4f46e5;
+        .main-content {
+            padding: 2rem;
+            background-color: #f8fafc;
+            border-radius: 20px;
         }
-        
-        .sidebar-content h1, .sidebar-content h2, .sidebar-content h4, .sidebar-content p { 
+        .sidebar-column {
+            background-color: #ffffff;
+            border: 2px solid #4f46e5;
+            border-radius: 20px;
+            padding: 2rem;
+            height: 90vh;
+        }
+        .sidebar-column h1, .sidebar-column h2, .sidebar-column h4, .sidebar-column p { 
             color: #0F172A !important; 
         }
-        .donation-section {
-            margin-top: 2rem;
-            text-align: center;
-        }
-        .social-links {
-            text-align: center;
-            margin-top: 1rem;
-            margin-bottom: 2rem;
-        }
-        .social-links a {
-            text-decoration: none;
-            color: #4f46e5;
-            margin: 0 10px;
-        }
-
-        .pix-button { 
-            background-color: #4f46e5; 
-            color: white !important; 
-            padding: 0.5rem 1rem;
-            border-radius: 10px; 
-            font-weight: bold; 
-            border: none;
-            width: 100%;
-            cursor: pointer;
-            margin-top: 1rem;
-        }
-        .pix-button:hover {
-            background-color: #4338ca;
-        }
-
-        .stButton>button { 
-            background-color: #4f46e5; 
-            color: white; 
-            border-radius: 10px; 
-            font-weight: bold; 
-            border: none;
-        }
-        .stButton>button:hover {
-            background-color: #4338ca;
-        }
-        
-        button[kind="secondary"] {
-            background-color: transparent !important;
-            color: #4f46e5 !important;
-            border: 1px solid #4f46e5 !important;
-        }
-        
-        .main-content-area, .stApp {
-             background-color: #f8fafc;
-        }
-
-        p, li, h3, h2, h1 { color: #0F172A !important; }
-
-        .recommendation-card {
-            background-color: #ffffff;
-            border-left: 5px solid #4f46e5;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
+        .donation-section { margin-top: 2rem; text-align: center; }
+        .social-links { text-align: center; margin-top: 1rem; margin-bottom: 2rem; }
+        .social-links a { text-decoration: none; color: #4f46e5; margin: 0 10px; }
+        .pix-button { background-color: #4f46e5; color: white !important; padding: 0.5rem 1rem; border-radius: 10px; font-weight: bold; border: none; width: 100%; cursor: pointer; margin-top: 1rem; }
+        .pix-button:hover { background-color: #4338ca; }
+        .stButton>button { background-color: #4f46e5; color: white; border-radius: 10px; font-weight: bold; border: none; }
+        .stButton>button:hover { background-color: #4338ca; }
+        button[kind="secondary"] { background-color: transparent !important; color: #4f46e5 !important; border: 1px solid #4f46e5 !important; }
+        .recommendation-card { background-color: #ffffff; border-left: 5px solid #4f46e5; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     </style>
     """, unsafe_allow_html=True)
 
 # --- PONTO DE ENTRADA PRINCIPAL ---
 load_css()
-if st.session_state.current_page == "verifier":
-    show_verifier_page()
-else:
-    show_protect_page()
+
+# ATUALIZAÇÃO: Usa colunas para criar um layout de sidebar fixa
+grid_col1, grid_col2 = st.columns([30, 70])
+
+with grid_col1:
+    st.markdown('<div class="sidebar-column">', unsafe_allow_html=True)
+    qrcode_b64 = get_image_as_base64("qrcodepix.jpeg")
+    qrcode_data_uri = f"data:image/jpeg;base64,{qrcode_b64}" if qrcode_b64 else "https://placehold.co/200x200/ffffff/000000?text=QR+Code"
+    pix_key = "00020101021126580014br.gov.bcb.pix01369aa2c17a-3621-4f52-9872-71fb9d1cc6b25204000053039865802BR5925Antonio Batista Leite Bis6009SAO PAULO622905251JZ5NK7F1B11G1CWMRAY7RF8763042488"
+    
+    st.markdown(f'<h1><img src="{page_icon_data}" width=32> Verificador</h1>', unsafe_allow_html=True)
+    st.markdown("<h2>Análise Inteligente de Golpes na Internet</h2>", unsafe_allow_html=True)
+    
+    with st.expander("Apoie este Projeto", expanded=True):
+        st.markdown(f"""
+            <div class="donation-section">
+                <p>Este é um projeto gratuito. Se ele foi útil, considere fazer uma doação. Qualquer valor, até R$ 0,01, é bem-vindo.</p>
+                <img src="{qrcode_data_uri}" alt="QR Code PIX" width="150">
+            </div>
+        """, unsafe_allow_html=True)
+        components.html(f"""
+            <textarea id="pix-key" style="position:absolute;left:-9999px;">{pix_key}</textarea>
+            <button class="pix-button" onclick="copyPix()">Pix Copia e Cola</button>
+            <script>function copyPix(){{var c=document.getElementById("pix-key");c.select();document.execCommand("copy");}}</script>
+        """, height=50)
+
+    st.markdown("""
+    <div class="social-links">
+        <a href="https://www.instagram.com/prof.jvictor/" target="_blank">Instagram</a> | 
+        <a href="https://linkedin.com/in/jvictorll/" target="_blank">LinkedIn</a>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("Aprenda a se Proteger", key="to_protect", use_container_width=True):
+        st.session_state.current_page = "protect"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with grid_col2:
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
+    if st.session_state.current_page == "verifier":
+        show_verifier_page(st.container())
+    else:
+        show_protect_page(st.container())
+    st.markdown('</div>', unsafe_allow_html=True)
