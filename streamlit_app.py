@@ -144,8 +144,8 @@ def display_analysis_results(analysis_data, full_response):
         st.subheader("🛡️ Recomendações de Segurança")
         recommendations = parsed_sections["Recomendações de Segurança"].split('\n')
         for rec in recommendations:
-            # Remove números e espaços do início (ex: "1. ")
-            rec_text = re.sub(r'^\d+\.\s*', '', rec).strip()
+            # CORREÇÃO: Remove números e todos os asteriscos antes de exibir
+            rec_text = re.sub(r'^\d+\.\s*|\*|\*\*', '', rec).strip()
             if rec_text:
                 st.markdown(f"<div class='recommendation-card'>{rec_text}</div>", unsafe_allow_html=True)
 
@@ -168,16 +168,15 @@ def load_css():
     <style>
         .block-container { padding: 1rem 2rem 2rem 2rem; }
         #MainMenu, header { visibility: hidden; }
-        .sidebar-content { background-color: #1e293b; color: #ffffff; padding: 2rem; height: 85vh; border-radius: 20px; display: flex; flex-direction: column; }
+        .sidebar-content { background-color: #1e293b; color: #ffffff; padding: 2rem; height: 90vh; border-radius: 20px; display: flex; flex-direction: column; }
         .sidebar-content h1 { font-size: 2rem; font-weight: bold; }
         .sidebar-content h2 { font-size: 1.5rem; margin-top: 2rem; color: #e2e8f0; line-height: 1.4; }
         .sidebar-content .call-to-action { margin-top: auto; background-color: #4f46e5; color: white; border: none; padding: 1rem; width: 100%; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
         .sidebar-content .call-to-action:hover { background-color: #4338ca; }
-        [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) { background-color: #f8fafc; padding: 2rem; height: 85vh; border-radius: 20px; overflow-y: auto; }
+        [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) { background-color: #f8fafc; padding: 2rem; height: 90vh; border-radius: 20px; overflow-y: auto; }
         .stButton>button { background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: bold; border: none; width: 100%; margin-top: 1rem; }
         p, li, h3, h2, h1 { color: #0F172A !important; }
 
-        /* NOVO: Estilo para os cartões de recomendação */
         .recommendation-card {
             background-color: #ffffff;
             border-left: 5px solid #4f46e5;
@@ -185,6 +184,22 @@ def load_css():
             border-radius: 8px;
             margin-bottom: 0.5rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* ATUALIZAÇÃO: Media Query para Responsividade */
+        @media (max-width: 768px) {
+            .block-container {
+                padding: 1rem;
+            }
+            /* Força colunas a empilhar */
+            [data-testid="stHorizontalBlock"] {
+                flex-direction: column;
+            }
+            /* Ajusta altura para auto em telas pequenas */
+            .sidebar-content, [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > div:nth-child(2) {
+                height: auto;
+                margin-bottom: 1rem;
+            }
         }
     </style>
     """, unsafe_allow_html=True)
@@ -207,7 +222,7 @@ def run_analysis(prompt_parts):
 
 # --- Interface Principal ---
 load_css()
-sidebar_col, main_col = st.columns([28, 72])
+sidebar_col, main_col = st.columns([30, 70]) # Ajuste de proporção
 
 with sidebar_col:
     st.markdown("""<div class="sidebar-content">
@@ -222,32 +237,32 @@ with main_col:
 
     text_input = st.text_area("Conteúdo textual:", value=st.session_state.text_for_analysis, height=150, key="text_area_input")
     
-    uploaded_image = st.file_uploader("Envie uma imagem (opcional):", type=["jpg", "jpeg", "png"])
-    
-    st.markdown("---")
-    st.markdown("<h5>Análise de Áudio</h5>", unsafe_allow_html=True)
-    
+    # ATUALIZAÇÃO: Layout de upload compacto
+    upload_col1, upload_col2 = st.columns(2)
+    with upload_col1:
+        uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "jpeg", "png"])
+    with upload_col2:
+        uploaded_audio = st.file_uploader("Envie um ficheiro de áudio:", type=["wav", "mp3", "m4a", "ogg"])
+
+    st.markdown("<h6>Ou grave um áudio:</h6>", unsafe_allow_html=True)
     audio_info = mic_recorder(
         start_prompt="Clique para Gravar",
         stop_prompt="Clique para Parar",
         key='recorder'
     )
     
-    uploaded_audio = st.file_uploader("Ou envie um ficheiro de áudio:", type=["wav", "mp3", "m4a", "ogg"])
-    
-    if audio_info and audio_info['bytes']:
-        st.write("Áudio gravado:")
-        st.audio(audio_info['bytes'])
-
-    if uploaded_audio:
-        st.write("Áudio enviado:")
-        st.audio(uploaded_audio)
-    
-    if uploaded_image:
-        st.image(uploaded_image, caption="Imagem a ser analisada", width=250)
+    # Exibe os previews dos ficheiros enviados
+    preview_col1, preview_col2 = st.columns(2)
+    with preview_col1:
+        if uploaded_image:
+            st.image(uploaded_image, caption="Imagem a ser analisada", width=200)
+    with preview_col2:
+        if uploaded_audio:
+            st.audio(uploaded_audio)
+        elif audio_info and audio_info['bytes']:
+            st.audio(audio_info['bytes'])
     
     if st.button("Verificar Agora", key="submit_unified"):
-        # Limpa os resultados anteriores antes de uma nova análise
         st.session_state.analysis_data = None
         st.session_state.full_response = None
 
@@ -269,7 +284,6 @@ with main_col:
 
         run_analysis(prompt_parts)
 
-    # Container para exibir os resultados
     results_placeholder = st.empty()
     with results_placeholder.container():
         if 'analysis_data' in st.session_state and st.session_state.analysis_data and "error" not in st.session_state.analysis_data:
