@@ -150,7 +150,7 @@ def show_verifier_page():
                 <h2>Análise Inteligente de Golpes na Internet</h2>
                 <div class="donation-section">
                     <h4>Apoie este Projeto</h4>
-                    <p>Este é um projeto gratuito. Se ele foi útil para você, considere fazer uma doação para ajudar a mantê-lo no ar.</p>
+                    <p>Este é um projeto gratuito. Se ele foi útil para você, considere fazer uma doação para ajudar a mantê-lo no ar. Qualquer valor, até mesmo R$ 0,01, é muito bem-vindo.</p>
                     <img src="{qrcode_data_uri}" alt="QR Code PIX" width="150">
                 </div>
             </div>
@@ -175,7 +175,6 @@ def show_verifier_page():
         </div>
         """, unsafe_allow_html=True)
         
-        # Botão para mudar de página
         if st.button("Aprenda a se Proteger", key="to_protect", use_container_width=True):
             st.session_state.current_page = "protect"
             st.rerun()
@@ -245,14 +244,62 @@ def show_protect_page():
         for titulo, descricao in golpes.items():
             with st.expander(titulo): st.write(descricao)
             
-    # ... (Restante do conteúdo da página de proteção) ...
+    with st.container(border=True):
+        st.header("Construa sua Fortaleza Digital")
+        st.subheader("1. Crie Senhas Fortes e Únicas")
+        frase = st.text_input("Digite uma frase para gerar uma senha:", placeholder="Ex: Meu cachorro Bob nasceu em 2015!")
+        if st.button("Gerar Senha"):
+            senha_gerada = gerar_senha(frase)
+            if "Erro" in senha_gerada: st.error(senha_gerada)
+            else: st.success(f"Senha gerada: `{senha_gerada}`")
+        st.subheader("2. Ative a Autenticação de Dois Fatores (2FA)")
+        st.write("A 2FA é uma tranca extra. Mesmo que alguém roube sua senha, não conseguirá acessar sua conta sem um segundo código do seu celular. Ative em todas as suas contas importantes (WhatsApp, Instagram, e-mail, bancos).")
+        st.subheader("3. Checklist do Comprador Seguro")
+        st.checkbox("O site começa com https:// e tem um cadeado? �")
+        st.checkbox("Os preços não são bons demais para ser verdade?")
+        st.checkbox("O site tem informações claras como CNPJ e endereço?")
+        st.checkbox("A reputação no Reclame Aqui é boa?")
+        st.checkbox("A loja oferece pagamentos seguros como cartão de crédito?")
+
+    # ATUALIZAÇÃO: Seção de Socorro reintegrada
+    with st.container(border=True):
+        st.header("🆘 Fui Vítima de um Golpe!")
+        st.write("Descobrir um golpe é assustador, mas agir rápido pode fazer toda a diferença. Siga o plano de ação e use nosso assistente para ajudar a formalizar sua denúncia.")
+
+        st.subheader("Plano de Ação Imediato")
+        st.markdown("""
+        - **Passo 1: Contate o Banco:** Ligue imediatamente para a central oficial do seu banco para bloquear cartões e contas.
+        - **Passo 2: Altere Suas Senhas:** Mude a senha do seu e-mail principal primeiro, depois das outras contas.
+        - **Passo 3: Faça um Boletim de Ocorrência (B.O.):** Registre um B.O. online na delegacia virtual do seu estado.
+        - **Passo 4: Tente Recuperar o Dinheiro (MED do Pix):** Se o golpe foi via Pix, peça ao seu banco para acionar o Mecanismo Especial de Devolução.
+        """)
+
+        st.subheader("✨ Assistente para Relato de Golpe")
+        st.write("Preencha os detalhes abaixo e nossa IA criará um texto formal para seu boletim de ocorrência ou para o contato com o banco.")
+
+        tipo_golpe = st.text_input("Qual foi o tipo de golpe?", placeholder="Ex: Pix para loja falsa, WhatsApp clonado", key="tipo_golpe")
+        prejuizo = st.text_input("O que você perdeu?", placeholder="Ex: R$ 500,00, acesso à conta do Instagram", key="prejuizo")
+        descricao = st.text_area("Descreva brevemente como o golpe aconteceu:", key="descricao_golpe")
+
+        if st.button("Gerar Relato"):
+            if all([tipo_golpe, prejuizo, descricao]):
+                with st.spinner("Gerando relato com a IA..."):
+                    relato_gerado = gerar_relato_golpe(tipo_golpe, prejuizo, descricao)
+                    st.text_area("Relato Gerado:", value=relato_gerado, height=300)
+                    st.success("Relato gerado com sucesso! Copie o texto acima.")
+            else:
+                st.warning("Por favor, preencha todos os campos para gerar o relato.")
 
 def load_css():
     st.markdown("""
     <style>
         #MainMenu, header { visibility: hidden; }
         
-        /* ATUALIZAÇÃO: Estilo da nova sidebar branca com borda */
+        /* ATUALIZAÇÃO: Remove o botão de recolher a sidebar */
+        button[kind="header"] {
+            display: none;
+        }
+        
         [data-testid="stSidebar"] > div:first-child {
             background-color: #ffffff;
             border-right: 2px solid #4f46e5;
@@ -276,7 +323,6 @@ def load_css():
             margin: 0 10px;
         }
 
-        /* Estilo do botão PIX */
         .pix-button { 
             background-color: #4f46e5; 
             color: white !important; 
@@ -332,3 +378,4 @@ if st.session_state.current_page == "verifier":
     show_verifier_page()
 else:
     show_protect_page()
+�
