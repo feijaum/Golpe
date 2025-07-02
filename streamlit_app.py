@@ -140,40 +140,38 @@ def display_analysis_results(data, response):
 
 def show_verifier_page():
     with st.sidebar:
-        # ATUALIZAÇÃO: Carrega a imagem do QR Code
         qrcode_b64 = get_image_as_base64("qrcodepix.jpeg")
         qrcode_data_uri = f"data:image/jpeg;base64,{qrcode_b64}" if qrcode_b64 else "https://placehold.co/200x200/ffffff/000000?text=QR+Code+Nao+Encontrado"
-        
-        st.markdown(f"""<div class="sidebar-content">
-            <h1><img src="{page_icon_data}" width=32> Verificador</h1>
-            <h2>Análise Inteligente de Golpes na Internet</h2>
-            
-            <div class="donation-section">
-                <h4>Apoie este Projeto</h4>
-                <p>Este é um projeto gratuito. Se ele foi útil para você, considere fazer uma doação para ajudar a mantê-lo no ar.</p>
-                <img src="{qrcode_data_uri}" alt="QR Code PIX" width="150">
-            </div>
-            </div>""", unsafe_allow_html=True)
-        
         pix_key = "00020101021126580014br.gov.bcb.pix01369aa2c17a-3621-4f52-9872-71fb9d1cc6b25204000053039865802BR5925Antonio Batista Leite Bis6009SAO PAULO622905251JZ5NK7F1B11G1CWMRAY7RF8763042488"
-        components.html(f"""
-            <textarea id="pix-key" style="position: absolute; left: -9999px;">{pix_key}</textarea>
-            <button class="pix-button" onclick="copyPix()">Pix Copia e Cola</button>
-            <script>
-            function copyPix() {{
-                var copyText = document.getElementById("pix-key");
-                copyText.select();
-                document.execCommand("copy");
-                alert("Chave PIX copiada!");
-            }}
-            </script>
-        """, height=50)
 
-        st.markdown("""
-        <div class="social-links">
-            <a href="https://www.instagram.com/prof.jvictor/" target="_blank">Instagram</a> | 
-            <a href="https://linkedin.com/in/jvictorll/" target="_blank">LinkedIn</a>
-        </div>
+        # ATUALIZAÇÃO: Todo o conteúdo da sidebar dentro de um único st.markdown
+        st.markdown(f"""
+            <div class="sidebar-content">
+                <h1><img src="{page_icon_data}" width=32> Verificador</h1>
+                <h2>Análise Inteligente de Golpes na Internet</h2>
+                
+                <div class="donation-section">
+                    <h4>Apoie este Projeto</h4>
+                    <p>Este é um projeto gratuito. Se ele foi útil para você, considere fazer uma doação para ajudar a mantê-lo no ar.</p>
+                    <img src="{qrcode_data_uri}" alt="QR Code PIX" width="150">
+                </div>
+                
+                <textarea id="pix-key" style="position: absolute; left: -9999px;">{pix_key}</textarea>
+                <button class="pix-button" onclick="copyPix()">Pix Copia e Cola</button>
+                
+                <div class="social-links">
+                    <a href="https://www.instagram.com/prof.jvictor/" target="_blank">Instagram</a> | 
+                    <a href="https://linkedin.com/in/jvictorll/" target="_blank">LinkedIn</a>
+                </div>
+            </div>
+            <script>
+                function copyPix() {{
+                    var copyText = document.getElementById("pix-key");
+                    copyText.select();
+                    document.execCommand("copy");
+                    // O alert foi removido para uma melhor experiência, mas pode ser adicionado de volta se necessário
+                }}
+            </script>
         """, unsafe_allow_html=True)
         
         if st.button("Aprenda a se Proteger", key="to_protect", use_container_width=True):
@@ -287,6 +285,7 @@ def load_css():
             border: none;
             width: 100%;
             cursor: pointer;
+            margin-top: 1rem;
         }
         .pix-button:hover {
             background-color: #4338ca;
