@@ -48,6 +48,8 @@ if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = None
 if 'theme' not in st.session_state:
     st.session_state.theme = "Automático"
+if 'recorded_audio' not in st.session_state:
+    st.session_state.recorded_audio = None
 
 # --- FUNÇÕES DO AGENTE DE IA (VERIFICADOR) ---
 def call_analyzer_agent(prompt_parts: list) -> dict:
@@ -147,15 +149,34 @@ def show_verifier_page():
     with options_col:
         uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "png"])
         uploaded_audio = st.file_uploader("Envie um áudio:", type=["wav", "mp3", "m4a"])
+        
+        st.markdown("<h6>Ou grave um áudio:</h6>", unsafe_allow_html=True)
         audio_info = mic_recorder("Gravar", "Parar", key='recorder')
-    
+        
+        if audio_info and audio_info['bytes']:
+            st.session_state.recorded_audio = audio_info['bytes']
+
+        if st.session_state.recorded_audio:
+            st.write("Áudio gravado:")
+            st.audio(st.session_state.recorded_audio)
+            if st.button("Apagar Gravação"):
+                st.session_state.recorded_audio = None
+                st.rerun()
+
     if verify_button:
         st.session_state.analysis_results = None
         prompt_parts = []
         if text_input: prompt_parts.append(text_input)
         if uploaded_image: prompt_parts.append(Image.open(uploaded_image))
-        audio_bytes = uploaded_audio.getvalue() if uploaded_audio else (audio_info['bytes'] if audio_info else None)
-        if audio_bytes: prompt_parts.append(genai.upload_file(path=io.BytesIO(audio_bytes), mime_type="audio/wav"))
+        
+        audio_to_process = None
+        if uploaded_audio:
+            audio_to_process = uploaded_audio.getvalue()
+        elif st.session_state.recorded_audio:
+            audio_to_process = st.session_state.recorded_audio
+            
+        if audio_to_process: 
+            prompt_parts.append(genai.upload_file(path=io.BytesIO(audio_to_process), mime_type="audio/wav"))
         
         if not prompt_parts:
             st.warning("Insira conteúdo para análise.")
@@ -246,36 +267,24 @@ def show_protect_page():
 def load_css(theme):
     # Define as cores baseadas no tema escolhido
     if theme == "dark":
-        # Cores para o tema escuro
-        st.markdown("""
-        <style>
-            :root {
+        st.markdown("""<style>:root {
                 --primary-bg: #0F172A; --secondary-bg: #1e293b; --sidebar-bg: #1e293b;
                 --text-color: #e2e8f0; --sidebar-text-color: #e2e8f0;
                 --button-bg: #4f46e5; --button-hover-bg: #6366f1; --button-text-color: #ffffff;
                 --border-color: #4f46e5;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+            }</style>""", unsafe_allow_html=True)
     else:
-        # Cores para o tema claro (padrão)
-        st.markdown("""
-        <style>
-            :root {
+        st.markdown("""<style>:root {
                 --primary-bg: #f8fafc; --secondary-bg: #ffffff; --sidebar-bg: #ffffff;
                 --text-color: #0F172A; --sidebar-text-color: #0F172A;
                 --button-bg: #4f46e5; --button-hover-bg: #4338ca; --button-text-color: #ffffff;
                 --border-color: #4f46e5;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+            }</style>""", unsafe_allow_html=True)
 
     # CSS geral que usa as variáveis
     st.markdown("""
     <style>
-        #MainMenu, header, button[data-testid="stSidebarNav-collapse-control"] { 
-            display: none;
-        }
+        #MainMenu, header, button[data-testid="stSidebarNav-collapse-control"] { display: none; }
         .stApp { background-color: var(--primary-bg); }
         [data-testid="stSidebar"] > div:first-child {
             background-color: var(--sidebar-bg);
@@ -289,15 +298,9 @@ def load_css(theme):
             color: var(--button-text-color) !important;
             border-radius: 10px; font-weight: bold; border: none;
         }
-        .stButton>button:hover, .pix-button:hover {
-            background-color: var(--button-hover-bg);
-        }
+        .stButton>button:hover, .pix-button:hover { background-color: var(--button-hover-bg); }
         p, li, h3, h2, h1 { color: var(--text-color) !important; }
-        .recommendation-card { 
-            background-color: var(--secondary-bg); 
-            border-left: 5px solid var(--button-bg);
-            padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
+        .recommendation-card { background-color: var(--secondary-bg); border-left: 5px solid var(--button-bg); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .social-links a { color: var(--button-bg); text-decoration: none; margin: 0 10px; }
         .donation-section { margin-top: 2rem; text-align: center; }
         .social-links { text-align: center; margin-top: 1rem; margin-bottom: 2rem; }
@@ -307,16 +310,13 @@ def load_css(theme):
 
 # --- PONTO DE ENTRADA PRINCIPAL ---
 
-# Lógica para aplicar o tema
 is_dark_system = streamlit_js_eval(js_expressions="window.matchMedia('(prefers-color-scheme: dark)').matches", key="theme_detect")
 theme_choice = st.session_state.get("theme", "Automático")
 active_theme = "dark" if (theme_choice == "Escuro" or (theme_choice == "Automático" and is_dark_system)) else "light"
 load_css(active_theme)
 
-# Renderiza a sidebar
 with st.sidebar:
     st.radio( "Tema", ["Automático", "Claro", "Escuro"], key="theme", horizontal=True)
-    
     qrcode_b64 = get_image_as_base64("qrcodepix.jpeg")
     qrcode_data_uri = f"data:image/jpeg;base64,{qrcode_b64}" if qrcode_b64 else ""
     pix_key = "00020101021126580014br.gov.bcb.pix01369aa2c17a-3621-4f52-9872-71fb9d1cc6b25204000053039865802BR5925Antonio Batista Leite Bis6009SAO PAULO622905251JZ5NK7F1B11G1CWMRAY7RF8763042488"
@@ -337,7 +337,6 @@ with st.sidebar:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Renderiza a página principal
 if st.session_state.current_page == "verifier":
     show_verifier_page()
 else:
