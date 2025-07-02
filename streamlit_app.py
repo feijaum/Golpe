@@ -378,4 +378,4 @@ if st.session_state.current_page == "verifier":
     show_verifier_page()
 else:
     show_protect_page()
-�
+
