@@ -235,7 +235,7 @@ def show_protect_page():
         st.subheader("2. Ative a Autenticação de Dois Fatores (2FA)")
         st.write("A 2FA é uma tranca extra...")
         st.subheader("3. Checklist do Comprador Seguro")
-        st.checkbox("O site começa com https:// e tem um cadeado? 🔒")
+        st.checkbox("O site começa com https:// e tem um cadeado? �")
         st.checkbox("Os preços não são bons demais para ser verdade?")
         st.checkbox("O site tem informações claras como CNPJ e endereço?")
         st.checkbox("A reputação no Reclame Aqui é boa?")
