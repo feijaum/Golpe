@@ -337,7 +337,7 @@ with st.sidebar:
     st.markdown(f'<div class="sidebar-content"><h1><img src="{page_icon_data}" width=32> Verificador</h1><h2>Análise Inteligente de Golpes na Internet</h2>', unsafe_allow_html=True)
     
     with st.expander("Apoie este Projeto"):
-        st.markdown(f'<div class="donation-section"><p>Este projeto é gratuito...</p><img src="{qrcode_data_uri}" alt="QR Code PIX" width="150"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="donation-section"><p>Este projeto é 100% gratuito. Para nos ajudar a continuar, considere doar via PIX (QR Code ou Copia e Cola). Qualquer valor é bem vindo. Sua ajuda é essencial. Muito obrigado!</p><img src="{qrcode_data_uri}" alt="QR Code PIX" width="150"></div>', unsafe_allow_html=True)
         components.html(f"""<textarea id="pix-key" style="position:absolute;left:-9999px;">{pix_key}</textarea><button class="pix-button" onclick="copyPix()">Pix Copia e Cola</button><script>function copyPix(){{var c=document.getElementById("pix-key");c.select();document.execCommand("copy");}}</script>""", height=50)
 
     st.markdown('<div class="social-links"><a href="https://www.instagram.com/prof.jvictor/" target="_blank">Instagram</a> | <a href="https://linkedin.com/in/jvictorll/" target="_blank">LinkedIn</a></div>', unsafe_allow_html=True)
