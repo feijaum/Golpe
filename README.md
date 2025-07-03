@@ -146,5 +146,5 @@ Este é um projeto de uso livre e gratuito. Se ele foi útil para você, conside
 <p align="center">
   <img src="qrcodepix.jpeg" alt="QR Code PIX" width="200"/>
   <br>
-  <strong>Chave PIX (Copia e Cola):</strong> <code>000201...2488</code>
+  <strong>Chave PIX (Copia e Cola):</strong> <code>00020101021126580014br.gov.bcb.pix01369aa2c17a-3621-4f52-9872-71fb9d1cc6b25204000053039865802BR5925Antonio Batista Leite Bis6009SAO PAULO622905251JZ5NK7F1B11G1CWMRAY7RF8763042488</code>
 </p>
