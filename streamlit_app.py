@@ -46,8 +46,6 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = "verifier"
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = None
-if 'theme' not in st.session_state:
-    st.session_state.theme = "Automático"
 if 'recorded_audio' not in st.session_state:
     st.session_state.recorded_audio = None
 
@@ -320,13 +318,18 @@ def load_css(theme):
 
 # --- PONTO DE ENTRADA PRINCIPAL ---
 
-is_dark_system = streamlit_js_eval(js_expressions="window.matchMedia('(prefers-color-scheme: dark)').matches", key="theme_detect")
-theme_choice = st.session_state.get("theme", "Automático")
-active_theme = "dark" if (theme_choice == "Escuro" or (theme_choice == "Automático" and is_dark_system)) else "light"
+# ATUALIZAÇÃO: Lógica do tema simplificada para usar apenas o modo claro por enquanto
+# A funcionalidade do modo escuro está comentada para uma futura ativação
+# is_dark_system = streamlit_js_eval(js_expressions="window.matchMedia('(prefers-color-scheme: dark)').matches", key="theme_detect")
+# theme_choice = st.session_state.get("theme", "Automático")
+# active_theme = "dark" if (theme_choice == "Escuro" or (theme_choice == "Automático" and is_dark_system)) else "light"
+active_theme = "light" # Força o tema claro
 load_css(active_theme)
 
 with st.sidebar:
-    st.radio( "Tema", ["Automático", "Claro", "Escuro"], key="theme", horizontal=True)
+    # O seletor de tema está comentado para ser reativado no futuro
+    # st.radio( "Tema", ["Automático", "Claro", "Escuro"], key="theme", horizontal=True)
+    
     qrcode_b64 = get_image_as_base64("qrcodepix.jpeg")
     qrcode_data_uri = f"data:image/jpeg;base64,{qrcode_b64}" if qrcode_b64 else ""
     pix_key = "00020101021126580014br.gov.bcb.pix01369aa2c17a-3621-4f52-9872-71fb9d1cc6b25204000053039865802BR5925Antonio Batista Leite Bis6009SAO PAULO622905251JZ5NK7F1B11G1CWMRAY7RF8763042488"
