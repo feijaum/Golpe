@@ -105,17 +105,16 @@ def gerar_relato_golpe(tipo, prejuizo, descricao):
 # --- FUNÇÕES DE UI ---
 def get_risk_color(risk): return {"alto": "#FF4B4B", "médio": "#FFC700", "baixo": "#28A745"}.get(risk.lower(), "#6c757d")
 
-def generate_pdf(risk, response):
+def generate_pdf(title, content):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "Relatorio de Analise de Risco", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 10, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
     pdf.ln(10)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, f"Nivel de Risco: {risk.upper()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font("Helvetica", "", 12)
-    cleaned = re.sub(r'###\s*|\*\*|\*', '', response).encode('latin-1', 'replace').decode('latin-1')
-    pdf.multi_cell(0, 10, cleaned)
+    # Limpa o texto de markdown e codifica para latin-1 para o PDF
+    cleaned_content = re.sub(r'###\s*|\*\*|\*', '', content).encode('latin-1', 'replace').decode('latin-1')
+    pdf.multi_cell(0, 10, cleaned_content)
     return bytes(pdf.output())
 
 def display_analysis_results(data, response):
@@ -135,8 +134,8 @@ def display_analysis_results(data, response):
         st.subheader("🔗 Fontes Consultadas")
         st.markdown(sections["Fontes Consultadas"])
         
-    pdf_bytes = generate_pdf(risk, response)
-    st.download_button("Salvar Relatório em PDF", pdf_bytes, "relatorio.pdf", "application/pdf")
+    pdf_bytes = generate_pdf(f"Relatorio de Analise - Risco {risk.upper()}", response)
+    st.download_button("Salvar Relatório em PDF", pdf_bytes, "relatorio_analise.pdf", "application/pdf")
 
 # --- LÓGICA DE RENDERIZAÇÃO DAS PÁGINAS ---
 
@@ -147,8 +146,11 @@ def show_verifier_page():
         text_input = st.text_area("Conteúdo textual:", height=300)
         verify_button = st.button("Verificar Agora", use_container_width=True)
     with options_col:
-        uploaded_image = st.file_uploader("Envie uma imagem:", type=["jpg", "png"])
-        uploaded_audio = st.file_uploader("Envie um áudio:", type=["wav", "mp3", "m4a"])
+        st.markdown("<h6>Envie uma imagem:</h6>", unsafe_allow_html=True)
+        uploaded_image = st.file_uploader("Arraste e solte ou procure o ficheiro", type=["jpg", "png"], label_visibility="collapsed")
+        
+        st.markdown("<h6>Envie um áudio:</h6>", unsafe_allow_html=True)
+        uploaded_audio = st.file_uploader("Arraste e solte ou procure o ficheiro", type=["wav", "mp3", "m4a"], label_visibility="collapsed")
         
         st.markdown("<h6>Ou grave um áudio:</h6>", unsafe_allow_html=True)
         audio_info = mic_recorder("Gravar", "Parar", key='recorder')
@@ -235,7 +237,7 @@ def show_protect_page():
         st.subheader("2. Ative a Autenticação de Dois Fatores (2FA)")
         st.write("A 2FA é uma tranca extra...")
         st.subheader("3. Checklist do Comprador Seguro")
-        st.checkbox("O site começa com https:// e tem um cadeado? �")
+        st.checkbox("O site começa com https:// e tem um cadeado? 🔒")
         st.checkbox("Os preços não são bons demais para ser verdade?")
         st.checkbox("O site tem informações claras como CNPJ e endereço?")
         st.checkbox("A reputação no Reclame Aqui é boa?")
@@ -259,8 +261,11 @@ def show_protect_page():
         if st.button("Gerar Relato"):
             if all([tipo_golpe, prejuizo, descricao]):
                 with st.spinner("Gerando relato..."):
-                    relato = gerar_relato_golpe(tipo_golpe, prejuizo, descricao)
-                    st.text_area("Relato Gerado:", value=relato, height=300)
+                    relato_gerado = gerar_relato_golpe(tipo_golpe, prejuizo, descricao)
+                    st.text_area("Relato Gerado:", value=relato_gerado, height=300)
+                    # ATUALIZAÇÃO: Botão de download para o relato
+                    pdf_bytes = generate_pdf("Relato de Ocorrência", relato_gerado)
+                    st.download_button("Baixar Relato em PDF", pdf_bytes, "relato_golpe.pdf", "application/pdf")
             else:
                 st.warning("Preencha todos os campos.")
 
@@ -300,7 +305,12 @@ def load_css(theme):
         }
         .stButton>button:hover, .pix-button:hover { background-color: var(--button-hover-bg); }
         p, li, h3, h2, h1 { color: var(--text-color) !important; }
-        .recommendation-card { background-color: var(--secondary-bg); border-left: 5px solid var(--button-bg); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .recommendation-card { 
+            background-color: var(--secondary-bg); 
+            border-left: 5px solid var(--button-bg);
+            padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            color: var(--text-color) !important; /* ATUALIZAÇÃO: Garante a cor do texto no modo escuro */
+        }
         .social-links a { color: var(--button-bg); text-decoration: none; margin: 0 10px; }
         .donation-section { margin-top: 2rem; text-align: center; }
         .social-links { text-align: center; margin-top: 1rem; margin-bottom: 2rem; }
